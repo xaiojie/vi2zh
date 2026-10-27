@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>越译中</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="brand">
+      <div class="logo">译</div>
+      <div class="titles">
+        <h1>越译中</h1>
+        <p>DeepSeek · 越南语 → 简体中文</p>
+      </div>
+    </div>
+    <span class="version" id="version">v—</span>
+  </header>
+
+  <main>
+    <section class="card" id="statusCard">
+      <div class="status-line">
+        <span class="dot" id="dot"></span>
+        <span id="statusText">正在读取页面状态…</span>
+        <span class="percent" id="percentText"></span>
+      </div>
+      <div class="bar"><div id="barFill"></div></div>
+      <div class="meta" id="metaText">—</div>
+      <div class="meta site-type" id="siteTypeText"></div>
+      <div class="cost-line">
+        <span class="cost" id="costText">≈ ¥0.0000</span>
+        <span class="cost-note" id="costNote">按官方价估算</span>
+      </div>
+      <div class="usage" id="usageText"></div>
+    </section>
+
+    <div class="actions">
+      <button id="btnTranslate" class="primary">翻译本页</button>
+      <button id="btnRestore" class="ghost">还原原文</button>
+    </div>
+
+    <label class="switch-row">
+      <span>本站自动翻译</span>
+      <span class="switch"><input type="checkbox" id="autoSite"><span class="slider"></span></span>
+    </label>
+    <p class="hint" id="siteHint">—</p>
+
+    <div id="notice" class="notice" hidden></div>
+
+    <details class="settings" id="settingsPanel">
+      <summary>设置与术语表</summary>
+
+      <div class="field">
+        <label for="apiKey">DeepSeek API Key</label>
+        <div class="input-group">
+          <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" spellcheck="false">
+          <button type="button" id="toggleKey" class="mini">显示</button>
+        </div>
+        <p class="help">保存在本机浏览器，只会发送到 DeepSeek 接口。可前往 platform.deepseek.com 创建。</p>
+      </div>
+
+      <div class="field">
+        <label for="baseUrl">接口地址</label>
+        <input type="url" id="baseUrl" placeholder="https://api.deepseek.com" spellcheck="false">
+        <p class="help">默认官方地址；使用中转服务时填其 /v1 地址，首次保存会请求该域名权限。</p>
+      </div>
+
+      <div class="field">
+        <label for="siteType">站点类型</label>
+        <select id="siteType">
+          <option value="auto">自动识别（推荐）</option>
+          <option value="generic">通用网页</option>
+          <option value="accounting">财务会计 / ERP</option>
+          <option value="ecommerce">电商 / 订单管理</option>
+          <option value="hr">招聘 / 人事</option>
+          <option value="news">资讯 / 内容</option>
+          <option value="education">教育 / 培训</option>
+        </select>
+        <p class="help">先判断网站类型，再套用对应领域的术语与翻译风格；识别不准时可手动指定。</p>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="model">模型</label>
+          <select id="model">
+            <option value="deepseek-flash">deepseek-flash（快、便宜）</option>
+            <option value="deepseek-v4-pro">deepseek-v4-pro（更准、较贵）</option>
+            <option value="deepseek-chat">deepseek-chat（旧名，按 Flash 计价）</option>
+            <option value="deepseek-reasoner">deepseek-reasoner（旧名，按 V4 Pro 计价）</option>
+          </select>
+        </div>
+        <div class="field narrow">
+          <label for="batchSize">每批条数</label>
+          <input type="number" id="batchSize" min="4" max="40" step="1">
+        </div>
+        <div class="field narrow">
+          <label for="concurrency">并发</label>
+          <input type="number" id="concurrency" min="1" max="8" step="1">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="maxRequests">单页请求上限</label>
+        <input type="number" id="maxRequests" min="20" max="2000" step="10">
+        <p class="help">防止页面频繁刷新导致请求失控，默认 300 次。</p>
+      </div>
+
+      <label class="check"><input type="checkbox" id="showOriginal"> 悬停显示原文（写入 title 提示）</label>
+      <label class="check"><input type="checkbox" id="respectNoTranslate"> 遵循网页的 translate=no 标记（关闭时连后台菜单等“声明不翻译”的区域也会翻译）</label>
+
+      <div class="field">
+        <label for="glossaryText">自定义术语表</label>
+        <textarea id="glossaryText" rows="4" placeholder="每行一条：越南语=中文&#10;Ví dụ: Thành tiền=金额"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="skipSelectors">不翻译的选择器</label>
+        <input type="text" id="skipSelectors" placeholder=".no-translate, #ads" spellcheck="false">
+      </div>
+
+      <div class="settings-actions">
+        <button id="btnSave" class="primary small">保存设置</button>
+        <button id="btnTest" class="ghost small">测试连接</button>
+        <button id="btnBalance" class="ghost small">查余额</button>
+        <button id="btnClearCache" class="ghost small">清空缓存</button>
+      </div>
+      <div id="settingsNotice" class="notice" hidden></div>
+    </details>
+  </main>
+
+  <footer>
+    <span>Alt+T 翻译 / 还原 · 右键菜单</span>
+    <span>译文缓存于本机</span>
+  </footer>
+
+  <script src="shared/defaults.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

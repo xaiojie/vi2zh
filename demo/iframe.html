@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Phiếu thu tiền mặt</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      background: #f8fafc;
+      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      font-size: 11.5px;
+      padding: 12px;
+    }
+    .sheet {
+      background: #fff;
+      border: 1px solid #e5eaf0;
+      border-radius: 9px;
+      padding: 12px 14px;
+    }
+    .head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    h1 { margin: 0; font-size: 13px; font-weight: 650; }
+    .no { color: #64748b; font-size: 10.5px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; margin-top: 10px; }
+    label { display: flex; flex-direction: column; gap: 4px; color: #64748b; font-size: 10px; font-weight: 600; }
+    input, select {
+      height: 28px;
+      padding: 0 9px;
+      border: 1px solid #dbe3ec;
+      border-radius: 6px;
+      background: #fff;
+      color: #0f172a;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 400;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: #6ee7b7; }
+    .amount input { font-weight: 650; color: #047857; }
+    .note { margin: 9px 0 0; color: #94a3b8; font-size: 9.5px; line-height: 1.5; }
+    .actions { display: flex; gap: 7px; margin-top: 10px; }
+    button, input[type="button"] {
+      height: 28px;
+      padding: 0 12px;
+      border: 1px solid #dbe3ec;
+      border-radius: 6px;
+      background: #fff;
+      color: #475569;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .primary { background: #0d9f6e; border-color: #0d9f6e; color: #fff; }
+    .primary:hover { background: #087a55; }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="head">
+      <h1>Phiếu thu tiền mặt</h1>
+      <span class="no">Số phiếu: PT000128</span>
+    </div>
+    <div class="grid">
+      <label>Ngày lập phiếu
+        <input type="text" value="21/10/2026">
+      </label>
+      <label>Người nộp tiền
+        <input type="text" value="Nguyễn Thu Trang">
+      </label>
+      <label>Lý do nộp
+        <input type="text" placeholder="Nhập lý do nộp tiền">
+      </label>
+      <label>Hình thức thanh toán
+        <select>
+          <option>Tiền mặt</option>
+          <option>Chuyển khoản</option>
+        </select>
+      </label>
+      <label class="amount">Số tiền
+        <input type="text" value="15.000.000 VND">
+      </label>
+      <label>Kèm theo
+        <input type="text" placeholder="Số chứng từ gốc" value="0">
+      </label>
+    </div>
+    <p class="note">Phiếu thu được lập tự động từ phân hệ Bán hàng. Vui lòng kiểm tra trước khi in và lưu.</p>
+    <div class="actions">
+      <input class="primary" type="button" value="In phiếu">
+      <button type="button">Đóng</button>
+    </div>
+  </div>
+</body>
+</html>

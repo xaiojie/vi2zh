@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MISA ASP - Bàn làm việc | Công ty TNHH Chuỗi Cung Ứng Liên Trang</title>
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 17.5z"/><path d="M4 8h14"/><path d="M16 13.5h4"/></symbol>
+    <symbol id="i-bank" viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 21h18"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><path d="M3 4h2l2.4 11.2A2 2 0 0 0 9.36 17H18a2 2 0 0 0 1.96-1.6L21 8H6"/><circle cx="10" cy="20" r="1.2"/><circle cx="18" cy="20" r="1.2"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></symbol>
+    <symbol id="i-tools" viewBox="0 0 24 24"><path d="M14.5 6.5a4 4 0 0 0-5.2 5.2L4 17l3 3 5.3-5.3a4 4 0 0 0 5.2-5.2l-2.6 2.6-2.4-2.4z"/></symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17.5" cy="9.5" r="2.2"/><path d="M15 14.5a4.5 4.5 0 0 1 6 3.3"/></symbol>
+    <symbol id="i-percent" viewBox="0 0 24 24"><path d="M6 18 18 6"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></symbol>
+    <symbol id="i-calc" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8.5 12h1M12 12h1M15.5 12h1M8.5 16h1M12 16h1M15.5 16h1"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M5 17h13"/><path d="M9 8h6"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-5M12.5 16V7M17 16v-8"/></symbol>
+    <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9 13h7M9 17h7"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2.5h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.1 1-1.1 1.9"/><circle cx="12" cy="17" r=".8"/></symbol>
+    <symbol id="i-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5.2l3.4 2"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">M</span>
+      <div class="brand-text">
+        <strong>MISA ASP</strong>
+        <small>CÔNG TY TNHH CHUỖI CUNG ỨNG LIÊN TRANG</small>
+      </div>
+    </div>
+    <button class="year-chip" type="button">KẾ TOÁN_2026 <span>▾</span></button>
+    <label class="search">
+      <svg class="ico"><use href="#i-search"></use></svg>
+      <input type="search" placeholder="Tìm kiếm chức năng, chứng từ, khách hàng…">
+    </label>
+    <button class="feature-pill" type="button">
+      <svg class="ico"><use href="#i-bolt"></use></svg>
+      Tính năng nổi bật
+    </button>
+    <div class="top-actions">
+      <button class="top-icon" type="button" title="Tải dữ liệu"><svg class="ico"><use href="#i-box"></use></svg></button>
+      <button class="top-icon" type="button" aria-label="Thông báo"><svg class="ico"><use href="#i-bell"></use></svg><span class="dot-red">4</span></button>
+      <button class="top-icon" type="button" title="Trợ giúp"><svg class="ico"><use href="#i-help"></use></svg></button>
+      <button class="top-icon" type="button" title="Cài đặt"><svg class="ico"><use href="#i-cog"></use></svg></button>
+      <button class="avatar" type="button" aria-label="Mở menu người dùng">LT</button>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <button class="add-company" type="button"><svg class="ico"><use href="#i-plus"></use></svg> Thêm nhanh</button>
+      <nav class="nav">
+        <a class="nav-item active" href="#"><svg class="ico"><use href="#i-grid"></use></svg> Tổng quan</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-wallet"></use></svg> Tiền mặt</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-bank"></use></svg> Tiền gửi</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-cart"></use></svg> Mua hàng</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-cart"></use></svg> Bán hàng</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-report"></use></svg> Quản lý hóa đơn</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-box"></use></svg> Kho</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-tools"></use></svg> Công cụ dụng cụ</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-screen"></use></svg> Tài sản cố định</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-users"></use></svg> Tiền lương</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-percent"></use></svg> Thuế</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-calc"></use></svg> Giá thành</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-book"></use></svg> Tổng hợp</a>
+        <a class="nav-item" href="#"><svg class="ico"><use href="#i-chart"></use></svg> Báo cáo</a>
+      </nav>
+      <div class="sidebar-foot">
+        <span>Phiên bản 2026.10</span>
+        <a href="#">Trợ giúp</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="promo">
+        <div class="promo-text">
+          <strong>Giới thiệu kế toán dịch vụ dùng MISA ASP — Nhận ngay 500k</strong>
+          <span>Nhận thưởng không giới hạn!</span>
+        </div>
+        <button class="btn promo-btn" type="button">Giới thiệu ngay</button>
+        <button class="promo-close" type="button" aria-label="Đóng thông báo"><svg class="ico"><use href="#i-close"></use></svg></button>
+      </section>
+
+      <div class="page-head">
+        <div class="tabs">
+          <span class="tab active">Bàn làm việc</span>
+          <span class="tab">Biểu đồ</span>
+          <span class="tab">Tính năng mới <em class="tag-new">New</em></span>
+        </div>
+        <div class="head-actions">
+          <button class="pill warn" type="button">Giới thiệu giao diện mới</button>
+          <button class="pill" type="button">Lưu ý quan trọng từ 2026</button>
+          <button class="pill ghost" type="button">Bắt đầu sử dụng</button>
+        </div>
+      </div>
+
+      <div class="auto-grid">
+        <article class="card auto-card">
+          <div class="card-head">
+            <h3>Tự động hạch toán hóa đơn đầu vào</h3>
+            <button class="icon-btn" type="button" title="Làm mới dữ liệu"><svg class="ico"><use href="#i-clock"></use></svg></button>
+          </div>
+          <div class="auto-body">
+            <div class="auto-count"><span class="num">0</span></div>
+            <p>Hóa đơn đầu vào đã xử lý và chờ xác nhận</p>
+            <input class="btn small" type="button" value="Xác nhận">
+          </div>
+        </article>
+
+        <article class="card auto-card">
+          <div class="card-head">
+            <h3>Tự động hạch toán hóa đơn đầu ra</h3>
+            <button class="icon-btn" type="button" title="Làm mới dữ liệu"><svg class="ico"><use href="#i-clock"></use></svg></button>
+          </div>
+          <div class="auto-body">
+            <div class="auto-count"><span class="num">0</span></div>
+            <p>Hóa đơn đầu ra đã xử lý và chờ xác nhận</p>
+            <input class="btn small" type="button" value="Xác nhận">
+          </div>
+        </article>
+
+        <article class="card auto-card">
+          <div class="card-head">
+            <h3>Thực hiện hàng loạt nghiệp vụ</h3>
+          </div>
+          <div class="auto-body">
+            <p class="wide">Thực hiện nhanh nhiều nghiệp vụ trên một màn hình, không cần nhập lại chứng từ.</p>
+            <button class="btn small" type="button">Thực hiện</button>
+          </div>
+        </article>
+      </div>
+
+      <section class="card section">
+        <div class="section-head">
+          <h2>Nghiệp vụ thường dùng</h2>
+          <button class="link-btn" type="button">Tùy chỉnh</button>
+        </div>
+        <div class="quick-grid">
+          <button class="quick" type="button"><span class="quick-ico">₫</span>Thu tiền mặt</button>
+          <button class="quick" type="button"><span class="quick-ico">₫</span>Chi tiền mặt</button>
+          <button class="quick" type="button"><span class="quick-ico">🏦</span>Thu tiền gửi</button>
+          <button class="quick" type="button"><span class="quick-ico">🏦</span>Chi tiền gửi</button>
+          <button class="quick" type="button"><span class="quick-ico">🛒</span>Chứng từ mua hàng</button>
+          <button class="quick" type="button"><span class="quick-ico">🛒</span>Chứng từ mua dịch vụ</button>
+          <button class="quick" type="button"><span class="quick-ico">🧾</span>Chứng từ bán hàng</button>
+        </div>
+      </section>
+
+      <div class="content-grid">
+        <div class="col-main">
+        <section class="card section">
+          <div class="section-head">
+            <h2>Hóa đơn mua hàng gần đây</h2>
+            <div class="section-tools">
+              <span class="updated" id="clock">Cập nhật lúc 09:45:12</span>
+              <button class="link-btn" type="button" id="addRow">Thêm dòng</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Số hóa đơn</th>
+                  <th>Ngày hóa đơn</th>
+                  <th>Nhà cung cấp</th>
+                  <th>Diễn giải</th>
+                  <th class="right">Tiền hàng</th>
+                  <th class="right">Thuế GTGT</th>
+                  <th class="right">Tổng tiền</th>
+                  <th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono">HD0001234</td>
+                  <td>21/10/2026</td>
+                  <td>Công ty TNHH Vật tư Minh Phát</td>
+                  <td>Mua văn phòng phẩm tháng 10</td>
+                  <td class="right mono">12.500.000</td>
+                  <td class="right mono">1.250.000</td>
+                  <td class="right mono">13.750.000</td>
+                  <td><span class="status pending" data-status>Chờ duyệt</span></td>
+                </tr>
+                <tr>
+                  <td class="mono">HD0001235</td>
+                  <td>20/10/2026</td>
+                  <td>Công ty CP Dịch vụ Sao Mai</td>
+                  <td>Phí vận chuyển hàng hóa</td>
+                  <td class="right mono">8.400.000</td>
+                  <td class="right mono">840.000</td>
+                  <td class="right mono">9.240.000</td>
+                  <td><span class="status approved">Đã duyệt</span></td>
+                </tr>
+                <tr>
+                  <td class="mono">HD0001236</td>
+                  <td>20/10/2026</td>
+                  <td>Công ty TNHH Thiết bị Việt An</td>
+                  <td>Mua máy tính để bàn</td>
+                  <td class="right mono">45.000.000</td>
+                  <td class="right mono">4.500.000</td>
+                  <td class="right mono">49.500.000</td>
+                  <td><span class="status rejected">Từ chối</span></td>
+                </tr>
+                <tr>
+                  <td class="mono">HD0001237</td>
+                  <td>19/10/2026</td>
+                  <td>Cửa hàng Văn phòng phẩm Hồng Hà</td>
+                  <td>Mua giấy in và mực máy in</td>
+                  <td class="right mono">3.200.000</td>
+                  <td class="right mono">320.000</td>
+                  <td class="right mono">3.520.000</td>
+                  <td><span class="status pending">Chờ duyệt</span></td>
+                </tr>
+                <tr>
+                  <td class="mono">HD0001238</td>
+                  <td>18/10/2026</td>
+                  <td>Công ty TNHH Phần mềm An Bình</td>
+                  <td>Gia hạn bản quyền phần mềm kế toán</td>
+                  <td class="right mono">22.000.000</td>
+                  <td class="right mono">2.200.000</td>
+                  <td class="right mono">24.200.000</td>
+                  <td><span class="status approved">Đã duyệt</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-foot">
+            <span>Tổng cộng: <strong class="mono">100.210.000 VND</strong></span>
+            <a class="link" href="#" title="Xem toàn bộ hóa đơn mua hàng">Xem tất cả hóa đơn</a>
+          </div>
+        </section>
+      <section class="card section">
+        <div class="section-head">
+          <h2>Tiện ích thường dùng</h2>
+          <button class="link-btn" type="button">Xem thêm</button>
+        </div>
+        <div class="utility-grid">
+          <a href="#">Nhập khẩu sao kê từ Excel</a>
+          <a href="#">Xuất khẩu hàng loạt</a>
+          <a href="#">Bỏ khóa sổ kỳ kế toán</a>
+          <a href="#">Đánh lại số chứng từ</a>
+          <a href="#">Phục hồi chứng từ đã xóa nhầm</a>
+          <a href="#">Thiết lập báo cáo tài chính</a>
+          <a href="#">Kiểm tra sổ sách</a>
+          <a href="#">Khóa sổ kỳ kế toán</a>
+          <a href="#">Lấy chứng từ từ dữ liệu khác</a>
+        </div>
+      </section>
+
+      <section class="card section tests">
+        <div class="section-head">
+          <h2>Kiểm thử bản dịch</h2>
+          <span class="badge-soft">Trang demo</span>
+        </div>
+        <p>Trang này chứa các trường hợp khó: văn bản động, iframe, Shadow DOM, placeholder, thuộc tính title, aria-label, alt, nút dạng input, số và mã chứng từ không được dịch.</p>
+        <div class="test-actions">
+          <button class="btn" type="button" id="openModal">Mở hộp thoại xác nhận</button>
+          <button class="btn ghost" type="button" id="cycleStatus">Đổi trạng thái dòng đầu</button>
+          <button class="btn ghost" type="button" id="addRow2">Thêm chứng từ mới</button>
+          <img src="chart.svg" width="150" height="60" alt="Biểu đồ doanh thu theo tháng">
+        </div>
+      </section>
+        </div>
+
+        <aside class="side-col">
+          <section class="card section">
+            <div class="section-head">
+              <h2>Thêm nhà cung cấp</h2>
+              <button class="icon-btn" type="button" aria-label="Đóng biểu mẫu"><svg class="ico"><use href="#i-close"></use></svg></button>
+            </div>
+            <form class="mini-form" onsubmit="return false">
+              <label>Mã nhà cung cấp
+                <input type="text" placeholder="Nhập mã nhà cung cấp" value="NCC00021">
+              </label>
+              <label>Tên nhà cung cấp
+                <input type="text" placeholder="Nhập tên nhà cung cấp">
+              </label>
+              <div class="two">
+                <label>Số điện thoại
+                  <input type="tel" placeholder="Nhập số điện thoại">
+                </label>
+                <label>Mã số thuế
+                  <input type="text" placeholder="Nhập mã số thuế">
+                </label>
+              </div>
+              <label>Loại nhà cung cấp
+                <select>
+                  <option>Trong nước</option>
+                  <option>Nước ngoài</option>
+                </select>
+              </label>
+              <label class="check"><input type="checkbox" checked> Theo dõi công nợ</label>
+              <div class="form-actions">
+                <button class="btn" type="button">Lưu</button>
+                <button class="btn ghost" type="button">Hủy bỏ</button>
+              </div>
+            </form>
+          </section>
+
+          <x-note-card></x-note-card>
+
+          <section class="card section iframe-card">
+            <div class="section-head">
+              <h2>Phiếu thu tiền mặt</h2>
+              <span class="badge-soft">Nhúng iframe</span>
+            </div>
+            <iframe src="iframe.html" title="Phiếu thu tiền mặt" loading="lazy"></iframe>
+          </section>
+        </aside>
+      </div>
+
+
+
+      <footer class="page-foot">
+        <span>© 2026 MISA ASP. Trang demo phục vụ kiểm thử tiện ích dịch.</span>
+        <span>Hotline: 1900 1234 · Email: hotro@example.vn · Website: https://example.vn</span>
+      </footer>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <h3 id="modalTitle">Xác nhận khóa sổ kỳ kế toán</h3>
+        <button class="icon-btn" type="button" id="closeModal" aria-label="Đóng hộp thoại"><svg class="ico"><use href="#i-close"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <p>Bạn có chắc chắn muốn khóa sổ kỳ kế toán tháng 10/2026?</p>
+        <p class="muted">Sau khi khóa, bạn không thể sửa hoặc xóa chứng từ trong kỳ. Hãy kiểm tra kỹ số liệu trước khi tiếp tục.</p>
+        <ul>
+          <li>Tổng số chứng từ: <strong>1.248</strong></li>
+          <li>Chênh lệch tạm tính: <strong>0 VND</strong></li>
+          <li>Người thực hiện: <strong>Nguyễn Thu Trang</strong></li>
+        </ul>
+      </div>
+      <div class="modal-foot">
+        <button class="btn ghost" type="button" id="cancelModal">Để sau</button>
+        <button class="btn" type="button" id="confirmModal">Đồng ý</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 动态内容 1：时钟（高频变动，用来验证熔断，不会持续计费）
+    const clock = document.getElementById('clock');
+    setInterval(() => {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      clock.textContent = `Cập nhật lúc ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }, 1000);
+
+    // 动态内容 2：状态反复重新渲染（验证本地缓存即时回套）
+    const statuses = [
+      ['Chờ duyệt', 'pending'],
+      ['Đã duyệt', 'approved']
+    ];
+    let statusIndex = 0;
+    setInterval(() => {
+      const cell = document.querySelector('[data-status]');
+      if (!cell) return;
+      statusIndex = (statusIndex + 1) % statuses.length;
+      cell.textContent = statuses[statusIndex][0];
+      cell.className = `status ${statuses[statusIndex][1]}`;
+    }, 4000);
+    document.getElementById('cycleStatus').addEventListener('click', () => {
+      const cell = document.querySelector('[data-status]');
+      statusIndex = (statusIndex + 1) % statuses.length;
+      cell.textContent = statuses[statusIndex][0];
+      cell.className = `status ${statuses[statusIndex][1]}`;
+    });
+
+    // 动态内容 3：新增行
+    let rowSeq = 1239;
+    function addRow() {
+      const tbody = document.querySelector('tbody');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="mono">HD000${rowSeq++}</td>
+        <td>21/10/2026</td>
+        <td>Công ty TNHH Dịch vụ Tân Phú</td>
+        <td>Phí dịch vụ kế toán tháng 10</td>
+        <td class="right mono">5.000.000</td>
+        <td class="right mono">500.000</td>
+        <td class="right mono">5.500.000</td>
+        <td><span class="status pending">Chờ duyệt</span></td>`;
+      tbody.appendChild(tr);
+    }
+    document.getElementById('addRow').addEventListener('click', addRow);
+    document.getElementById('addRow2').addEventListener('click', addRow);
+
+    // 弹窗
+    const modal = document.getElementById('modal');
+    document.getElementById('openModal').addEventListener('click', () => { modal.hidden = false; });
+    document.getElementById('closeModal').addEventListener('click', () => { modal.hidden = true; });
+    document.getElementById('cancelModal').addEventListener('click', () => { modal.hidden = true; });
+    document.getElementById('confirmModal').addEventListener('click', () => { modal.hidden = true; });
+
+    // Shadow DOM 组件
+    class NoteCard extends HTMLElement {
+      connectedCallback() {
+        if (this.shadowRoot) return;
+        const root = this.attachShadow({ mode: 'open' });
+        root.innerHTML = `
+          <style>
+            :host { display: block; }
+            .card {
+              background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+              padding: 14px 16px; box-shadow: 0 2px 8px rgba(15, 23, 42, .05);
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            }
+            h3 { margin: 0 0 8px; font-size: 14px; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+            p { margin: 0 0 10px; font-size: 12.5px; line-height: 1.6; color: #475569; }
+            button {
+              border: none; border-radius: 8px; padding: 7px 12px; cursor: pointer;
+              background: #0d9f6e; color: #fff; font: inherit; font-size: 12px; font-weight: 600;
+            }
+            .tag { font-size: 10px; font-weight: 600; color: #0d9f6e; background: #e6f7f1; border-radius: 999px; padding: 2px 7px; }
+          </style>
+          <div class="card">
+            <h3>Ghi chú nhanh <span class="tag">Shadow DOM</span></h3>
+            <p>Đơn vị chưa đối chiếu số dư tiền gửi ngân hàng. Vui lòng kiểm tra trước khi khóa sổ.</p>
+            <button type="button">Đối chiếu ngay</button>
+          </div>`;
+      }
+    }
+    customElements.define('x-note-card', NoteCard);
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="60" viewBox="0 0 150 60" role="img" aria-label="Biểu đồ doanh thu theo tháng">
+  <rect width="150" height="60" rx="6" fill="#f8fafc"/>
+  <g stroke="#e2e8f0" stroke-width="1">
+    <line x1="10" y1="48" x2="140" y2="48"/>
+    <line x1="10" y1="34" x2="140" y2="34"/>
+    <line x1="10" y1="20" x2="140" y2="20"/>
+  </g>
+  <g fill="#0d9f6e">
+    <rect x="18" y="30" width="12" height="18" rx="2"/>
+    <rect x="40" y="22" width="12" height="26" rx="2"/>
+    <rect x="62" y="36" width="12" height="12" rx="2"/>
+    <rect x="84" y="16" width="12" height="32" rx="2"/>
+    <rect x="106" y="26" width="12" height="22" rx="2"/>
+  </g>
+  <g fill="#5eead4">
+    <rect x="120" y="12" width="12" height="36" rx="2"/>
+  </g>
+  <g fill="#94a3b8" font-family="Arial, sans-serif" font-size="6">
+    <text x="18" y="57">T1</text>
+    <text x="40" y="57">T2</text>
+    <text x="62" y="57">T3</text>
+    <text x="84" y="57">T4</text>
+    <text x="106" y="57">T5</text>
+    <text x="120" y="57">T6</text>
+  </g>
+</svg>
