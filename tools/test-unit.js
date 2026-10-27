@@ -60,11 +60,28 @@ check('manifest：MV3', manifest.manifest_version === 3);
 check('manifest：版本号格式', /^\d+\.\d+\.\d+$/.test(manifest.version), manifest.version);
 check('manifest：options 页', manifest.options_ui && manifest.options_ui.page === 'src/options.html');
 const scripts = manifest.content_scripts[0].js;
-check('manifest：内容脚本顺序', scripts.join(',') === 'src/shared/defaults.js,src/shared/lang.js,src/shared/sites.js,src/content.js', scripts);
+check('manifest：内容脚本顺序', scripts.join(',') === 'src/shared/platform.js,src/shared/defaults.js,src/shared/lang.js,src/shared/sites.js,src/content.js', scripts);
 check('manifest：GitHub API 权限', (manifest.host_permissions || []).includes('https://api.github.com/*'));
 
-for (const file of ['src/options.html', 'src/options.css', 'src/options.js', 'src/shared/lang.js']) {
+for (const file of ['src/options.html', 'src/options.css', 'src/options.js', 'src/shared/lang.js', 'src/shared/platform.js']) {
   check(`文件存在：${file}`, fs.existsSync(path.join(ROOT, file)));
+}
+
+for (const page of ['options', 'popup']) {
+  const html = fs.readFileSync(path.join(ROOT, `src/${page}.html`), 'utf8');
+  const js = fs.readFileSync(path.join(ROOT, `src/${page}.js`), 'utf8');
+  const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
+  const used = [...js.matchAll(/\$\('([^']+)'\)/g)].map((m) => m[1]);
+  const missing = used.filter((id) => !ids.has(id));
+  check(`${page} 页元素 id 完整`, missing.length === 0, missing);
+}
+
+const firefoxManifest = path.join(ROOT, 'dist/vi2zh-firefox/manifest.json');
+if (fs.existsSync(firefoxManifest)) {
+  const ff = JSON.parse(fs.readFileSync(firefoxManifest, 'utf8'));
+  check('Firefox 包：事件页脚本', Array.isArray(ff.background?.scripts) && ff.background.scripts.includes('src/background.js'));
+  check('Firefox 包：gecko 配置', ff.browser_specific_settings?.gecko?.id === 'vi2zh@jay.local');
+  check('Firefox 包：无 service worker', ff.background?.service_worker === undefined);
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

@@ -35,6 +35,22 @@
     <!-- 翻译设置 -->
     <section class="panel active" id="panel-general">
       <div class="card">
+        <h2>DeepSeek 接口</h2>
+        <div class="grid two">
+          <label class="field">API Key
+            <input type="password" id="apiKey" placeholder="sk-…" autocomplete="off">
+          </label>
+          <label class="field">接口地址（支持中转）
+            <input type="url" id="baseUrl" placeholder="https://api.deepseek.com">
+          </label>
+        </div>
+        <p class="help">默认官方地址；填中转地址后，保存时会向该域名申请访问权限。Key 只保存在本机。</p>
+        <div class="row">
+          <button class="ghost" id="btnTestConn">测试连接</button>
+          <span class="help" id="testHint">—</span>
+        </div>
+      </div>
+      <div class="card">
         <h2>翻译方式</h2>
         <div class="grid two">
           <label class="field">
@@ -214,10 +230,17 @@
       </div>
 
       <div class="card">
+        <h2>质量反馈记录</h2>
+        <p class="help">在页面里 <code>Alt + 点击</code>译文 →「报告问题」，会记下原文、译文与站点，最多 200 条，只存在本机。</p>
+        <div class="list" id="feedbackList"></div>
+        <div class="row"><button id="btnClearFeedback" class="ghost">清空反馈</button></div>
+      </div>
+
+      <div class="card">
         <h2>浏览器兼容</h2>
         <ul class="bullets">
           <li><strong>Chrome / Edge</strong>：直接加载 <code>dist/vi2zh-translator</code>，Edge 在 <code>edge://extensions</code> 打开开发者模式即可。</li>
-          <li><strong>Firefox</strong>：Firefox 109+ 支持 MV3，需在 <code>about:debugging</code> → “临时载入附加组件”选择 manifest.json；部分 <code>chrome.*</code> 回调需 polyfill，当前版本未做完整适配。</li>
+          <li><strong>Firefox</strong>：执行 <code>npm run build:firefox</code>，得到 <code>dist/vi2zh-firefox</code>；在 <code>about:debugging</code> →「临时载入附加组件」选择其中的 <code>manifest.json</code>（需要 Firefox 128+，已内置 <code>browser.*</code> Promise 适配层）。</li>
           <li><strong>更新</strong>：源码分发时用 <code>npm run build</code> 生成新版本，重新加载扩展后刷新页面即可。</li>
         </ul>
       </div>
@@ -231,6 +254,7 @@
 
   <div id="toast" class="toast" hidden></div>
 
+  <script src="shared/platform.js"></script>
   <script src="shared/defaults.js"></script>
   <script src="shared/pricing.js"></script>
   <script src="shared/sites.js"></script>

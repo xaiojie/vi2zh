@@ -3,7 +3,10 @@
  */
 'use strict';
 
-importScripts('shared/defaults.js', 'shared/glossary.js', 'shared/pricing.js', 'shared/sites.js', 'shared/lang.js');
+// Chrome 用 service worker，需要 importScripts；Firefox 的事件页由 manifest 按顺序加载。
+if (typeof importScripts === 'function') {
+  importScripts('shared/defaults.js', 'shared/glossary.js', 'shared/pricing.js', 'shared/sites.js', 'shared/lang.js');
+}
 
 const SETTINGS_KEY = 'settings';
 const CACHE_KEY = 'trCache';

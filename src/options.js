@@ -98,7 +98,27 @@ function fillSiteTypeOptions() {
   }
 }
 
+async function ensureHostPermission(baseUrl) {
+  let url;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    return false;
+  }
+  if (!/^https?:$/.test(url.protocol)) return false;
+  if (['api.deepseek.com', 'localhost', '127.0.0.1'].includes(url.hostname)) return true;
+  const origin = `${url.protocol}//${url.hostname}/*`;
+  try {
+    if (await chrome.permissions.contains({ origins: [origin] })) return true;
+    return await chrome.permissions.request({ origins: [origin] });
+  } catch {
+    return false;
+  }
+}
+
 function fillGeneral() {
+  $('apiKey').value = settings.apiKey || '';
+  $('baseUrl').value = settings.baseUrl || DEFAULTS.baseUrl;
   $('mode').value = settings.mode === 'bilingual' ? 'bilingual' : 'replace';
   $('modelMode').value = settings.modelMode === 'auto' ? 'auto' : 'fixed';
   $('model').value = MODEL_VALUES.includes(settings.model) ? settings.model : DEFAULTS.model;
@@ -120,6 +140,8 @@ function fillGeneral() {
 
 function collectGeneral() {
   return {
+    apiKey: $('apiKey').value.trim(),
+    baseUrl: $('baseUrl').value.trim() || DEFAULTS.baseUrl,
     mode: $('mode').value === 'bilingual' ? 'bilingual' : 'replace',
     modelMode: $('modelMode').value === 'auto' ? 'auto' : 'fixed',
     model: MODEL_VALUES.includes($('model').value) ? $('model').value : DEFAULTS.model,
@@ -351,6 +373,36 @@ async function autoCheckUpdate() {
   }
 }
 
+async function renderFeedback() {
+  const stored = await chrome.storage.local.get('feedback');
+  const list = Array.isArray(stored.feedback) ? stored.feedback : [];
+  const box = $('feedbackList');
+  box.innerHTML = '';
+  if (!list.length) {
+    box.innerHTML = '<p class="help">还没有反馈记录。</p>';
+    return;
+  }
+  const head = document.createElement('p');
+  head.className = 'help';
+  head.textContent = `共 ${list.length} 条`;
+  box.appendChild(head);
+  for (const item of list.slice(0, 20)) {
+    const row = document.createElement('div');
+    row.className = 'list-row';
+    const main = document.createElement('div');
+    main.className = 'list-main';
+    const strong = document.createElement('strong');
+    strong.textContent = `${item.text || ''} → ${item.translation || ''}`;
+    const meta = document.createElement('span');
+    meta.className = 'muted';
+    meta.textContent = `${item.site || '未知站点'} · ${new Date(item.at).toLocaleString()}`;
+    main.appendChild(strong);
+    main.appendChild(meta);
+    row.appendChild(main);
+    box.appendChild(row);
+  }
+}
+
 async function checkUpdate() {
   const button = $('btnCheckUpdate');
   button.disabled = true;
@@ -443,9 +495,28 @@ function bind() {
   });
 
   $('btnSaveAll').addEventListener('click', async () => {
-    await saveSettings(collectGeneral());
+    const next = collectGeneral();
+    if (!(await ensureHostPermission(next.baseUrl))) {
+      toast('未获得该接口域名的访问权限', 'warn');
+      return;
+    }
+    await saveSettings(next);
     fillGeneral();
     refreshUsage();
+  });
+
+  $('btnTestConn').addEventListener('click', async () => {
+    const next = collectGeneral();
+    if (!next.apiKey) return toast('请先填写 API Key', 'warn');
+    if (!(await ensureHostPermission(next.baseUrl))) return toast('未获得该接口域名的访问权限', 'warn');
+    $('testHint').textContent = '测试中…';
+    const response = await chrome.runtime.sendMessage({
+      type: 'VI2ZH_TEST',
+      settings: { ...next, model: $('model').value }
+    });
+    $('testHint').textContent = response && response.ok
+      ? `连接成功（${response.latencyMs} ms），模型：${response.model}`
+      : (response && response.error) || '连接失败';
   });
 
   $('btnSaveRule').addEventListener('click', saveRule);
@@ -478,6 +549,11 @@ function bind() {
   $('btnBalance').addEventListener('click', checkBalance);
   $('btnClearCache').addEventListener('click', clearCache);
   $('btnCheckUpdate').addEventListener('click', checkUpdate);
+  $('btnClearFeedback').addEventListener('click', async () => {
+    await chrome.storage.local.remove('feedback');
+    renderFeedback();
+    toast('反馈记录已清空');
+  });
   $('btnClose').addEventListener('click', () => window.close());
   $('btnSyncUpload').addEventListener('click', syncUpload);
   $('btnSyncPull').addEventListener('click', syncPull);
@@ -528,6 +604,7 @@ async function init() {
 
   bind();
   refreshUsage();
+  renderFeedback();
   autoCheckUpdate();
 }
 

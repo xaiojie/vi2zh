@@ -149,6 +149,8 @@ npm run mock           # 启动本地 Mock DeepSeek（127.0.0.1:8787）
 npm run serve          # 静态服务项目根目录（127.0.0.1:8788），访问 /demo/
 npm test               # 端到端测试（自动起 mock + 静态服务）
 npm run icons          # 重新生成图标（需要 Pillow）
+npm run build          # Chrome/Edge 包：版本 +1，输出 dist/vi2zh-translator + zip
+npm run build:firefox  # Firefox 包：输出 dist/vi2zh-firefox + vi2zh-firefox-v<版本>.zip
 ```
 
 `npm test` 会启动真实的 Chrome for Testing、加载未打包扩展、打开 `demo/` 演示页，用 Mock 接口完成一次完整翻译，并断言：
@@ -234,6 +236,20 @@ vi2zh-translator/
 │   └── e2e.js              Puppeteer 端到端测试 + 截图
 └── screenshots/            测试自动生成的截图
 ```
+
+## 浏览器兼容
+
+| 浏览器 | 使用方式 | 说明 |
+| --- | --- | --- |
+| Chrome 116+ | 加载 `dist/vi2zh-translator` | 主要开发与验证环境 |
+| Edge 116+ | 加载 `dist/vi2zh-translator` | Chromium 内核，`edge://extensions` 打开开发者模式，步骤同 Chrome |
+| Firefox 128+ | `npm run build:firefox` 后，在 `about:debugging` →「临时载入附加组件」选择 `dist/vi2zh-firefox/manifest.json` | 自动生成 `background.scripts` 事件页清单，并用 `src/shared/platform.js` 把 `chrome.*` 指向 Promise 化的 `browser.*` |
+
+Firefox 注意事项：
+
+- 临时载入的扩展在浏览器重启后会消失，需要重新载入；正式分发需要签名或使用 Developer Edition 的 `xpinstall.signatures.required=false`。
+- 未在 Firefox 上跑过完整 e2e（`npm test` 仍只针对 Chrome for Testing），如遇兼容问题请带截图反馈。
+- `optional_host_permissions` 在首次填写自定义中转地址时会请求授权，行为与 Chrome 一致。
 
 ## 已知限制
 
