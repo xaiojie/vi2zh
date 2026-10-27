@@ -3,7 +3,7 @@
  */
 'use strict';
 
-importScripts('shared/defaults.js', 'shared/glossary.js', 'shared/pricing.js', 'shared/sites.js');
+importScripts('shared/defaults.js', 'shared/glossary.js', 'shared/pricing.js', 'shared/sites.js', 'shared/lang.js');
 
 const SETTINGS_KEY = 'settings';
 const CACHE_KEY = 'trCache';
@@ -12,7 +12,7 @@ const CACHE_LIMIT = 8000;
 const MAX_TEXTS_PER_REQUEST = 60;
 
 const SYSTEM_PROMPT = [
-  '你是「越译中」网页翻译引擎，专门把越南语网页界面翻译成简体中文。',
+  '你是「越译中」网页翻译引擎，把网页界面文本翻译成目标语言（默认简体中文）。',
   '用户会发送一个 JSON 对象：{"glossary": {"越南语术语": "中文译法"}, "texts": ["...", "..."]}。',
   '你必须只输出一个 JSON 对象：{"translations": ["...", "..."]}。',
   '',
@@ -21,7 +21,7 @@ const SYSTEM_PROMPT = [
   '2. 只输出 JSON 本身，不要 Markdown 代码块，不要解释，不要任何前后缀。',
   '3. 保留占位符与格式：{0}、{{name}}、%s、%d、<br>、换行、URL、邮箱、税号、金额数字、日期（dd/MM/yyyy）、时间、快捷键、单位符号。',
   '4. 品牌、产品名与缩写保留原文（如 MISA、Excel、Zalo、Viettel、VND、VNĐ）；越南专有名词用通用中文译名。',
-  '5. 界面用语简洁自然（按钮 2~6 字），符合中文互联网产品习惯；术语严格优先采用 glossary 中的译法。',
+  '5. 界面用语简洁自然（按钮 2~6 字）；若 glossary 中有对应术语，严格优先采用。',
   '6. 原文已是中文、纯数字、乱码或确实无法翻译时，原样返回该条。',
   '7. 不要添加原文没有的标点、语气词或说明；英文缩写保持大写。',
   '8. 即使单条文本很短，也必须给出译文，不允许返回空字符串。'
@@ -32,6 +32,110 @@ function siteInstruction(siteType) {
   const profile = sites && sites.profileOf ? sites.profileOf(siteType) : null;
   if (!profile) return '';
   return `\n\n当前站点类型：${profile.label}。\n${profile.prompt.join('\n')}`;
+}
+
+function langInstruction(lang) {
+  const L = globalThis.VI2ZH_LANG;
+  const src = lang && lang.src && lang.src !== 'auto' ? L.label(lang.src) : '原文语言';
+  const tgt = L.label((lang && lang.tgt) || 'zh');
+  return `\n\n本批源语言：${src}；目标语言：${tgt}。必须逐条翻译成${tgt}，不要混入其他语言。`;
+}
+
+/** 自动模式：长段落用 v4-pro，其余走 flash，兼顾质量与成本 */
+function routeModel(texts, settings, siteType) {
+  if (settings.modelMode !== 'auto') return settings.model || 'deepseek-flash';
+  const longest = texts.reduce((max, text) => Math.max(max, String(text).length), 0);
+  const dense = siteType === 'accounting' && texts.length > 18;
+  return longest > 150 || dense ? 'deepseek-v4-pro' : 'deepseek-flash';
+}
+
+/* ------------------------------------------------------------------ */
+/* 隐私脱敏：金额、单号、邮箱、URL 替换成占位符，模型返回后还原        */
+/* ------------------------------------------------------------------ */
+
+const REDACT_PATTERNS = [
+  /\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/gi,
+  /https?:\/\/\S+/gi,
+  /\b\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?\b/g,
+  /\b\d{6,}\b/g
+];
+
+function redactText(text) {
+  const values = [];
+  let output = String(text);
+  for (const pattern of REDACT_PATTERNS) {
+    output = output.replace(pattern, (match) => {
+      const token = `{P${values.length}}`;
+      values.push(match);
+      return token;
+    });
+  }
+  return { text: output, values };
+}
+
+function restoreText(text, values) {
+  let output = String(text);
+  let missing = false;
+  values.forEach((value, index) => {
+    const token = `{P${index}}`;
+    if (!output.includes(token)) missing = true;
+    output = output.split(token).join(value);
+  });
+  // 占位符被模型吃掉时宁可保留原文，也不让金额/单号变成错的
+  return missing ? '' : output;
+}
+
+/* ------------------------------------------------------------------ */
+/* 预算与修正记忆                                                      */
+/* ------------------------------------------------------------------ */
+
+async function monthCost(usage) {
+  const month = globalThis.VI2ZH_PRICING.beijingDate().slice(0, 7);
+  return Object.entries(usage.daily || {})
+    .filter(([date]) => date.startsWith(month))
+    .reduce((sum, [, item]) => sum + (Number(item.costCNY) || 0), 0);
+}
+
+async function checkBudget(settings) {
+  if (!settings.budgetDaily && !settings.budgetMonthly) return '';
+  const usage = await readUsage();
+  const today = globalThis.VI2ZH_PRICING.beijingDate();
+  const todayCost = Number(usage.daily?.[today]?.costCNY) || 0;
+  if (settings.budgetDaily > 0 && todayCost >= settings.budgetDaily) {
+    return `今日费用 ¥${todayCost.toFixed(4)} 已达到预算 ¥${Number(settings.budgetDaily).toFixed(2)}，已暂停翻译。可在设置里调高预算或明天再试。`;
+  }
+  if (settings.budgetMonthly > 0) {
+    const cost = await monthCost(usage);
+    if (cost >= settings.budgetMonthly) {
+      return `本月费用 ¥${cost.toFixed(4)} 已达到预算 ¥${Number(settings.budgetMonthly).toFixed(2)}，已暂停翻译。`;
+    }
+  }
+  return '';
+}
+
+const TM_KEY = 'tm';
+let tmCache = null;
+
+async function loadTM() {
+  if (!tmCache) {
+    const stored = await chrome.storage.local.get(TM_KEY);
+    tmCache = stored[TM_KEY] || {};
+  }
+  return tmCache;
+}
+
+async function saveTM() {
+  if (!tmCache) return;
+  const entries = Object.entries(tmCache);
+  // 只留最近 5000 条，避免无上限增长
+  if (entries.length > 5000) {
+    tmCache = Object.fromEntries(entries.slice(-5000));
+  }
+  await chrome.storage.local.set({ [TM_KEY]: tmCache });
+}
+
+function tmKey(siteType, text) {
+  return `${siteType || 'generic'}\n${text}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -47,6 +151,10 @@ const settingsReady = chrome.storage.local.get(SETTINGS_KEY).then((stored) => {
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local' || !changes[SETTINGS_KEY]) return;
   settingsCache = { ...globalThis.VI2ZH_DEFAULTS, ...(changes[SETTINGS_KEY].newValue || {}) };
+  if (settingsCache.syncEnabled) {
+    const { apiKey, ...safe } = settingsCache;
+    chrome.storage.sync.set({ vi2zhSettings: safe, vi2zhSettingsAt: Date.now() }).catch(() => {});
+  }
 });
 
 async function getSettings() {
@@ -102,8 +210,8 @@ async function flushCache() {
   }
 }
 
-async function cacheKey(text, settings, siteType) {
-  const raw = `${settings.model || ''}\u0000${settings.baseUrl || ''}\u0000${settings.glossaryText || ''}\u0000${siteType}\u0000${text}`;
+async function cacheKey(text, settings, siteType = 'generic', lang = { src: 'vi', tgt: 'zh' }, model = '') {
+  const raw = `${model || settings.model || ''}\u0000${settings.baseUrl || ''}\u0000${settings.glossaryText || ''}\u0000${siteType}\u0000${lang.src}\u0000${lang.tgt}\u0000${text}`;
   const bytes = new TextEncoder().encode(raw);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
@@ -223,6 +331,16 @@ class ApiError extends Error {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function compareVersions(a, b) {
+  const pa = String(a || '0').split('.').map((n) => Number(n) || 0);
+  const pb = String(b || '0').split('.').map((n) => Number(n) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff) return diff > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
 const MAX_CONCURRENT_CALLS = 4;
 let activeCalls = 0;
 const waitingCalls = [];
@@ -295,14 +413,15 @@ function normalizeItem(item) {
   return '';
 }
 
-async function callDeepSeek(texts, settings, siteType) {
+async function callDeepSeek(texts, settings, siteType, lang = { src: 'vi', tgt: 'zh' }, modelOverride = '') {
   const baseUrl = String(settings.baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '');
-  const model = settings.model || 'deepseek-flash';
+  const model = modelOverride || settings.model || 'deepseek-flash';
+  const glossary = lang.tgt === 'zh' && lang.src === 'vi' ? pickGlossary(texts, settings) : {};
   const payload = {
     model,
     messages: [
-      { role: 'system', content: `${SYSTEM_PROMPT}${siteInstruction(siteType)}` },
-      { role: 'user', content: JSON.stringify({ glossary: pickGlossary(texts, settings), texts }) }
+      { role: 'system', content: `${SYSTEM_PROMPT}${siteInstruction(siteType)}${langInstruction(lang)}` },
+      { role: 'user', content: JSON.stringify({ glossary, texts }) }
     ],
     temperature: 1.0,
     max_tokens: 8192,
@@ -362,11 +481,11 @@ async function callDeepSeek(texts, settings, siteType) {
   return list;
 }
 
-async function requestWithRetry(texts, settings, siteType) {
+async function requestWithRetry(texts, settings, siteType, lang, model) {
   const attempts = 3;
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      return await callDeepSeek(texts, settings, siteType);
+      return await callDeepSeek(texts, settings, siteType, lang, model);
     } catch (err) {
       if (err instanceof ApiError && err.fatal) throw err;
       const retryable =
@@ -384,9 +503,9 @@ async function requestWithRetry(texts, settings, siteType) {
  * 先整批翻译；若失败或条数不匹配就二分拆批，最多拆 3 层。
  * 拆批中某一半彻底失败时用空串占位，让另一半的译文仍能生效。
  */
-async function translateWithSplit(texts, settings, depth = 0, siteType = 'generic') {
+async function translateWithSplit(texts, settings, depth = 0, siteType = 'generic', lang, model) {
   try {
-    return await requestWithRetry(texts, settings, siteType);
+    return await requestWithRetry(texts, settings, siteType, lang, model);
   } catch (err) {
     if (err instanceof ApiError && err.fatal) throw err;
     if (texts.length <= 1 || depth >= 3) throw err;
@@ -397,14 +516,14 @@ async function translateWithSplit(texts, settings, depth = 0, siteType = 'generi
 
     let left;
     try {
-      left = await translateWithSplit(leftTexts, settings, depth + 1, siteType);
+      left = await translateWithSplit(leftTexts, settings, depth + 1, siteType, lang, model);
     } catch (leftError) {
       if (leftError instanceof ApiError && leftError.fatal) throw leftError;
       left = new Array(leftTexts.length).fill('');
     }
     let right;
     try {
-      right = await translateWithSplit(rightTexts, settings, depth + 1, siteType);
+      right = await translateWithSplit(rightTexts, settings, depth + 1, siteType, lang, model);
     } catch (rightError) {
       if (rightError instanceof ApiError && rightError.fatal) throw rightError;
       right = new Array(rightTexts.length).fill('');
@@ -413,41 +532,68 @@ async function translateWithSplit(texts, settings, depth = 0, siteType = 'generi
   }
 }
 
-async function translateBatch(texts, settings, { skipCache = false, siteType = 'generic' } = {}) {
+async function translateBatch(texts, settings, { skipCache = false, skipTM = false, siteType = 'generic', srcLang = '', tgtLang = '' } = {}) {
   await loadCache();
-  const keys = await Promise.all(texts.map((text) => cacheKey(text, settings, siteType)));
+  const tgt = String(tgtLang || settings.targetLang || 'zh');
+  let src = String(srcLang || settings.sourceLang || 'vi');
+  if (src === 'auto') src = globalThis.VI2ZH_LANG.detectForTranslation(texts.join('\n'), 'vi').code;
+  const lang = { src, tgt };
+  const model = routeModel(texts, settings, siteType);
+  const keys = await Promise.all(texts.map((text) => cacheKey(text, settings, siteType, lang, model)));
+  const tm = skipTM ? {} : await loadTM();
 
   const translations = {};
   const misses = [];
 
   texts.forEach((text, index) => {
+    const fixed = tm[tmKey(siteType, text)];
+    if (!skipTM && fixed) {
+      translations[text] = fixed;
+      return;
+    }
     const cached = skipCache ? '' : translationCache.get(keys[index]);
     if (cached) {
       translations[text] = cached;
     } else {
-      misses.push({ text, key: keys[index] });
+      misses.push({ text, key: keys[index], redacted: settings.privacyMode ? redactText(text) : null });
     }
   });
 
   let error = null;
   let fatal = false;
   if (misses.length) {
-    try {
-      const list = await translateWithSplit(misses.map((item) => item.text), settings, 0, siteType);
-      misses.forEach((item, index) => {
-        const translated = typeof list[index] === 'string' ? list[index].trim() : '';
-        if (!translated) return;
-        translations[item.text] = translated;
-        if (!skipCache) putCache(item.key, translated);
-      });
-    } catch (err) {
-      error = err.message || String(err);
-      fatal = err instanceof ApiError && err.fatal;
+    const budgetError = await checkBudget(settings);
+    if (budgetError) {
+      error = budgetError;
+      fatal = true;
+    } else {
+      try {
+        const list = await translateWithSplit(
+          misses.map((item) => (item.redacted ? item.redacted.text : item.text)),
+          settings,
+          0,
+          siteType,
+          lang,
+          model
+        );
+        misses.forEach((item, index) => {
+          let translated = typeof list[index] === 'string' ? list[index].trim() : '';
+          if (translated && item.redacted) {
+            translated = restoreText(translated, item.redacted.values);
+          }
+          if (!translated) return;
+          translations[item.text] = translated;
+          if (!skipCache) putCache(item.key, translated);
+        });
+      } catch (err) {
+        error = err.message || String(err);
+        fatal = err instanceof ApiError && err.fatal;
+      }
     }
   }
 
   const failed = texts.filter((text) => !translations[text]);
-  return { translations, failed, error, fatal };
+  return { translations, failed, error, fatal, lang, model };
 }
 
 /* ------------------------------------------------------------------ */
@@ -567,7 +713,11 @@ async function handleTranslate(message, sender, sendResponse) {
   }
   const siteType = globalThis.VI2ZH_SITES ? globalThis.VI2ZH_SITES.resolve(message.siteType) : 'generic';
   try {
-    const result = await translateBatch(texts, settings, { siteType });
+    const result = await translateBatch(texts, settings, {
+      siteType,
+      srcLang: message.srcLang || '',
+      tgtLang: message.tgtLang || ''
+    });
     sendResponse({
       ok: true,
       siteType,
@@ -695,6 +845,100 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })();
       return true;
 
+    case 'VI2ZH_CORRECT': {
+      (async () => {
+        const settings = await getSettings();
+        const text = String(message.text || '').trim();
+        const translation = String(message.translation || '').trim();
+        if (!text || !translation) {
+          sendResponse({ ok: false, error: '原文或译文为空' });
+          return;
+        }
+        const siteType = globalThis.VI2ZH_SITES ? globalThis.VI2ZH_SITES.resolve(message.siteType) : 'generic';
+        const lang = { src: message.srcLang || settings.sourceLang || 'vi', tgt: message.tgtLang || settings.targetLang || 'zh' };
+        const tm = await loadTM();
+        tm[tmKey(siteType, text)] = translation;
+        await saveTM();
+        const key = await cacheKey(text, settings, siteType, lang, settings.model || 'deepseek-flash');
+        putCache(key, translation);
+        sendResponse({ ok: true, siteType });
+      })();
+      return true;
+    }
+
+    case 'VI2ZH_FORCE_TRANSLATE': {
+      (async () => {
+        const settings = await getSettings();
+        if (!settings.apiKey) {
+          sendResponse({ ok: false, fatal: true, error: '尚未配置 DeepSeek API Key', translations: {}, failed: [] });
+          return;
+        }
+        let texts = Array.isArray(message.texts) ? message.texts.filter((t) => typeof t === 'string' && t.trim()) : [];
+        texts = [...new Set(texts)].slice(0, MAX_TEXTS_PER_REQUEST);
+        const siteType = globalThis.VI2ZH_SITES ? globalThis.VI2ZH_SITES.resolve(message.siteType) : 'generic';
+        try {
+          const result = await translateBatch(texts, settings, {
+            skipCache: true,
+            skipTM: true,
+            siteType,
+            srcLang: message.srcLang || '',
+            tgtLang: message.tgtLang || ''
+          });
+          sendResponse({ ok: true, translations: result.translations, failed: result.failed, error: result.error || null, fatal: !!result.fatal });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message || String(err), translations: {}, failed: texts });
+        }
+      })();
+      return true;
+    }
+
+    case 'VI2ZH_FEEDBACK': {
+      (async () => {
+        try {
+          const stored = await chrome.storage.local.get('feedback');
+          const list = Array.isArray(stored.feedback) ? stored.feedback : [];
+          list.unshift({
+            at: Date.now(),
+            site: (() => { try { return new URL(sender.tab?.url || '').hostname; } catch { return ''; } })(),
+            srcLang: message.srcLang || '',
+            tgtLang: message.tgtLang || '',
+            text: String(message.text || '').slice(0, 500),
+            translation: String(message.translation || '').slice(0, 500),
+            note: String(message.note || '').slice(0, 200)
+          });
+          await chrome.storage.local.set({ feedback: list.slice(0, 200) });
+          sendResponse({ ok: true, total: list.length });
+        } catch (err) {
+          sendResponse({ ok: false, error: err.message || String(err) });
+        }
+      })();
+      return true;
+    }
+
+    case 'VI2ZH_CHECK_UPDATE': {
+      (async () => {
+        try {
+          const response = await fetch('https://api.github.com/repos/xaiojie/vi2zh/releases/latest', {
+            headers: { Accept: 'application/vnd.github+json' }
+          });
+          if (!response.ok) throw new Error(`GitHub 返回 ${response.status}`);
+          const data = await response.json();
+          const latest = String(data.tag_name || '').replace(/^v/i, '');
+          const current = chrome.runtime.getManifest().version;
+          sendResponse({
+            ok: true,
+            current,
+            latest,
+            url: data.html_url || 'https://github.com/xaiojie/vi2zh/releases',
+            newer: compareVersions(latest, current) > 0
+          });
+        } catch (err) {
+          sendResponse({ ok: false, error: `暂时无法检查更新：${err.message || err}` });
+        }
+      })();
+      return true;
+    }
+
     case 'VI2ZH_CLEAR_CACHE':
       loadCache().then(async () => {
         const cleared = translationCache.size;
@@ -742,13 +986,37 @@ chrome.commands.onCommand.addListener(async (command) => {
   await toggleTab(tab);
 });
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create(
-    { id: 'vi2zh-toggle', title: '越译中：翻译 / 还原此页面', contexts: ['page'] },
-    () => void chrome.runtime.lastError
-  );
-});
+function createMenus() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create(
+      { id: 'vi2zh-toggle', title: 'Vi2Zh：翻译 / 还原此页面', contexts: ['page'] },
+      () => void chrome.runtime.lastError
+    );
+    chrome.contextMenus.create(
+      { id: 'vi2zh-selection', title: 'Vi2Zh：翻译选中文本', contexts: ['selection'] },
+      () => void chrome.runtime.lastError
+    );
+  });
+}
+
+chrome.runtime.onInstalled.addListener(createMenus);
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'vi2zh-toggle') toggleTab(tab);
+  if (info.menuItemId === 'vi2zh-toggle') {
+    toggleTab(tab);
+    return;
+  }
+  if (info.menuItemId === 'vi2zh-selection' && tab?.id) {
+    chrome.tabs.sendMessage(tab.id, { type: 'VI2ZH_TRANSLATE_SELECTION' }, { frameId: 0 }).catch(async () => {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['src/shared/defaults.js', 'src/shared/lang.js', 'src/content.js']
+        });
+        chrome.tabs.sendMessage(tab.id, { type: 'VI2ZH_TRANSLATE_SELECTION' }, { frameId: 0 });
+      } catch {
+        /* 页面不允许注入时忽略 */
+      }
+    });
+  }
 });

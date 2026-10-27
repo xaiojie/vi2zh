@@ -38,7 +38,13 @@
     autoHosts: [],
     skipSelectors: '',
     glossaryText: '',
-    respectNoTranslate: false
+    respectNoTranslate: false,
+    mode: 'replace',
+    selectionTranslate: true,
+    inputTranslate: true,
+    sourceLang: 'auto',
+    targetLang: 'zh',
+    siteRules: {}
   };
 
   const MARK = 'data-vi2zh';
@@ -59,7 +65,10 @@
 
   const state = {
     settings: null,
+    baseSettings: null,
     siteType: null,
+    pageLang: null,
+    rule: null,
     enabled: false,
     staleContext: false,
     generation: 0,
@@ -110,21 +119,74 @@
     return sites.detect({ host: location.hostname, title: document.title, sample });
   }
 
+  function hostRule(base) {
+    try {
+      return (base.siteRules && base.siteRules[location.hostname]) || {};
+    } catch {
+      return {};
+    }
+  }
+
+  function applyHostRule(base) {
+    const rule = hostRule(base);
+    state.rule = rule;
+    return {
+      ...base,
+      mode: rule.mode || base.mode || 'replace',
+      siteType: rule.siteType || base.siteType || 'auto',
+      skipSelectors: rule.skipSelectors || base.skipSelectors || '',
+      auto: rule.auto === undefined
+        ? Array.isArray(base.autoHosts) && base.autoHosts.includes(location.hostname)
+        : !!rule.auto,
+      disabled: !!rule.disabled
+    };
+  }
+
+  function detectPageLang() {
+    const explicit = String((state.baseSettings && state.baseSettings.sourceLang) || 'auto');
+    if (explicit !== 'auto') {
+      const label = globalThis.VI2ZH_LANG ? globalThis.VI2ZH_LANG.label(explicit) : explicit;
+      return { code: explicit, label, confidence: 'manual', source: 'setting' };
+    }
+    let sample = '';
+    try {
+      sample = (document.body?.innerText || '').slice(0, 12000);
+    } catch {
+      /* ignore */
+    }
+    if (globalThis.VI2ZH_LANG) {
+      const result = globalThis.VI2ZH_LANG.detectForTranslation(sample, 'vi');
+      return { ...result, source: 'page' };
+    }
+    return { code: 'vi', label: '越南语', confidence: 'low', source: 'fallback' };
+  }
+
   async function loadSettings() {
     try {
       const stored = await chrome.storage.local.get('settings');
-      state.settings = { ...DEFAULTS, ...(stored.settings || {}) };
+      state.baseSettings = { ...DEFAULTS, ...(stored.settings || {}) };
     } catch {
-      state.settings = { ...DEFAULTS };
+      state.baseSettings = { ...DEFAULTS };
     }
+    state.settings = applyHostRule(state.baseSettings);
+    state.pageLang = detectPageLang();
     return state.settings;
   }
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.settings) return;
-    state.settings = { ...DEFAULTS, ...(changes.settings.newValue || {}) };
+    const previousMode = state.settings && state.settings.mode;
+    state.baseSettings = { ...DEFAULTS, ...(changes.settings.newValue || {}) };
+    state.settings = applyHostRule(state.baseSettings);
     state.siteType = detectSite();
+    state.pageLang = detectPageLang();
     if (!state.settings.showOriginal) removeAllTips();
+    if (state.enabled && previousMode !== state.settings.mode) {
+      // 切换“替换/双语”后重建 DOM，已缓存译文不会重复请求
+      restoreDom();
+      scanDocument();
+      schedulePump();
+    }
   });
 
   /* ---------------------------------------------------------------- */
@@ -153,7 +215,13 @@
     if (!text) return false;
     if (text.length < 2 || text.length > TEXT_MAX_LENGTH) return false;
     if (!RE_LETTER.test(text)) return false;
-    if (RE_CJK.test(text) && !RE_VI.test(text)) return false;  // 已经是中文/日韩文
+    const target = String((state.settings && state.settings.targetLang) || 'zh');
+    if (globalThis.VI2ZH_LANG) {
+      const detected = globalThis.VI2ZH_LANG.detect(text);
+      if (detected.code === target && detected.confidence === 'high') return false;
+    } else if (RE_CJK.test(text) && !RE_VI.test(text)) {
+      return false;
+    }
     if (looksLikeCode(text)) return false;
 
     // 金额、日期、比例：字母极少时保持原样，避免把 1.250.000 改坏
@@ -329,9 +397,25 @@
     }, 40);
   }
 
+  function keyVisible(key) {
+    const set = state.pending.get(key);
+    if (!set) return false;
+    for (const record of set) {
+      const el = record.kind === 'text' ? record.node?.parentElement : record.el;
+      if (!el || !el.isConnected) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom >= -160 && rect.top <= (window.innerHeight || 800) + 320) return true;
+    }
+    return false;
+  }
+
   function takeBatch(settings) {
     const maxItems = Math.max(1, Math.min(40, Number(settings.batchSize) || 24));
     const maxChars = 2600;
+    // 视口内的文本优先发出，长页面首屏更快出现译文
+    if (state.queue.length > maxItems * 2) {
+      state.queue.sort((a, b) => Number(keyVisible(b)) - Number(keyVisible(a)));
+    }
     const keys = [];
     let chars = 0;
     while (state.queue.length && keys.length < maxItems) {
@@ -376,7 +460,11 @@
     let response;
     try {
       const siteType = state.siteType?.id || 'generic';
-      response = await sendToBackground({ type: 'VI2ZH_TRANSLATE', texts: keys, siteType });
+      const srcLang = (state.settings.sourceLang && state.settings.sourceLang !== 'auto')
+        ? state.settings.sourceLang
+        : (state.pageLang && state.pageLang.code) || 'auto';
+      const tgtLang = state.settings.targetLang || 'zh';
+      response = await sendToBackground({ type: 'VI2ZH_TRANSLATE', texts: keys, siteType, srcLang, tgtLang });
     } catch (err) {
       const message = err?.message || String(err);
       // 扩展被重新加载/更新后，旧页面里的脚本会失去 chrome.* 运行时
@@ -433,6 +521,25 @@
     pump();
   }
 
+  function isInlineParent(el) {
+    if (/^(BUTTON|A|LABEL|SUMMARY|OPTION|LEGEND)$/.test(el.tagName)) return true;
+    const display = getComputedStyle(el).display;
+    return display === 'inline' || display === 'inline-block' || display === 'inline-flex' || display === 'contents';
+  }
+
+  function ensureOriginalSpan(record, el, original) {
+    let span = record.origEl;
+    if (!span || !span.isConnected) {
+      span = document.createElement('span');
+      span.setAttribute(MARK, 'orig');
+      span.style.cssText = 'display:block;font-size:11px;line-height:1.45;color:#8a94a6;margin-top:2px;white-space:normal;';
+      el.appendChild(span);
+      record.origEl = span;
+    }
+    const text = String(original).replace(/\s+/g, ' ').trim();
+    if (span.textContent !== text) span.textContent = text;
+  }
+
   function applyRecord(record, translated) {
     if (!translated) return;
     if (record.kind === 'text') {
@@ -449,7 +556,12 @@
       } catch {
         return;
       }
-      if ((state.settings || DEFAULTS).showOriginal) attachOriginalTip(node, original);
+      const mode = (state.settings || DEFAULTS).mode || 'replace';
+      const parent = node.parentElement;
+      if (mode === 'bilingual' && parent && parent.isConnected && !isInlineParent(parent)) {
+        ensureOriginalSpan(record, parent, original);
+      }
+      if ((state.settings || DEFAULTS).showOriginal && mode !== 'bilingual') attachOriginalTip(node, original);
     } else if (record.kind === 'attr') {
       const el = record.el;
       if (!el || !el.isConnected) return;
@@ -479,6 +591,9 @@
   }
 
   function removeAllTips() {
+    for (const el of document.querySelectorAll('[data-vi2zh="orig"]')) {
+      try { el.remove(); } catch { /* ignore */ }
+    }
     for (const tip of state.tips) {
       if (!tip.el.isConnected) continue;
       if (tip.el.getAttribute('title') === tip.value) tip.el.removeAttribute('title');
@@ -878,6 +993,439 @@
   }
 
   /* ---------------------------------------------------------------- */
+  /* 悬浮气泡：划词翻译 / 输入框翻译 / 译文修正                        */
+  /* ---------------------------------------------------------------- */
+
+  const BUBBLE_CSS = `
+    :host { all: initial; }
+    .card {
+      position: fixed;
+      box-sizing: border-box;
+      min-width: 92px;
+      max-width: 380px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #0f172a;
+      color: #e6eef7;
+      border: 1px solid rgba(45, 212, 191, .45);
+      box-shadow: 0 12px 32px rgba(2, 6, 23, .45);
+      font: 13px/1.55 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      pointer-events: auto;
+      user-select: text;
+    }
+    .card[hidden] { display: none; }
+    .head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
+    .tag { font-size:11px; letter-spacing:.08em; color:#5eead4; text-transform:uppercase; }
+    .close { all: unset; cursor:pointer; color:#94a3b8; font-size:15px; line-height:1; padding:2px 4px; }
+    .close:hover { color:#e2e8f0; }
+    .orig { color:#94a3b8; font-size:12px; max-height:72px; overflow:auto; margin-bottom:6px; white-space:pre-wrap; }
+    .result { color:#f8fafc; white-space:pre-wrap; word-break:break-word; }
+    .loading { color:#94a3b8; }
+    .actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    button.act {
+      all: unset; cursor:pointer; padding:5px 10px; border-radius:6px;
+      background:#134e4a; color:#ccfbf1; font-size:12px; border:1px solid rgba(45,212,191,.35);
+    }
+    button.act:hover { background:#115e59; }
+    button.act.primary { background:#0d9488; color:#f0fdfa; border-color:#14b8a6; }
+    textarea {
+      width:100%; box-sizing:border-box; min-height:56px; resize:vertical;
+      background:#0b1220; color:#f1f5f9; border:1px solid #334155; border-radius:6px;
+      padding:6px 8px; font:13px/1.5 inherit;
+    }
+    .hint { color:#64748b; font-size:11px; margin-top:6px; }
+    .error { color:#fca5a5; font-size:12px; margin-top:6px; }
+    .standalone { padding: 6px 12px; }
+    button.standalone-btn {
+      all: unset; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+      padding:6px 12px; border-radius:999px; background:#0d9488; color:#f0fdfa;
+      font:600 13px/1 -apple-system, "PingFang SC", sans-serif;
+      box-shadow:0 6px 18px rgba(13,148,136,.45); border:1px solid #14b8a6;
+    }
+  `;
+
+  const bubble = { host: null, root: null, card: null, mode: '', text: '', record: null, inputEl: null, lastFocus: null };
+
+  function ensureBubble() {
+    if (bubble.host && bubble.host.isConnected) return bubble;
+    const host = document.createElement('div');
+    host.setAttribute(MARK, 'bubble');
+    host.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483646;';
+    const root = host.attachShadow({ mode: 'open' });
+    const style = document.createElement('style');
+    style.textContent = BUBBLE_CSS;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.hidden = true;
+    root.append(style, card);
+    (document.documentElement || document.body).appendChild(host);
+    bubble.host = host;
+    bubble.root = root;
+    bubble.card = card;
+    root.addEventListener('click', onBubbleClick);
+    return bubble;
+  }
+
+  function hideBubble() {
+    if (!bubble.card) return;
+    bubble.card.hidden = true;
+    bubble.card.innerHTML = '';
+    bubble.mode = '';
+    bubble.text = '';
+    bubble.record = null;
+  }
+
+  function placeBubble(x, y) {
+    const card = ensureBubble().card;
+    card.style.left = '0px';
+    card.style.top = '0px';
+    card.hidden = false;
+    const rect = card.getBoundingClientRect();
+    const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
+    card.style.left = `${left}px`;
+    card.style.top = `${top}px`;
+  }
+
+  function langPairFor(text) {
+    const L = globalThis.VI2ZH_LANG;
+    const tgt = (state.settings && state.settings.targetLang) || 'zh';
+    let src = (state.settings && state.settings.sourceLang) || 'auto';
+    if (!src || src === 'auto') {
+      src = L ? L.detect(text).code : 'vi';
+      if (!src || src === 'unknown' || src === tgt) src = tgt === 'zh' ? 'vi' : 'zh';
+    }
+    return { src, tgt };
+  }
+
+  async function requestTranslation(text) {
+    const pair = langPairFor(text);
+    const res = await sendToBackground({
+      type: 'VI2ZH_TRANSLATE',
+      texts: [text],
+      siteType: state.siteType?.id || 'generic',
+      srcLang: pair.src,
+      tgtLang: pair.tgt
+    });
+    const translated = (res && res.translations && res.translations[text]) || '';
+    if (!translated && res && res.error) throw new Error(res.error);
+    return { translated, pair };
+  }
+
+  function standaloneButton(label) {
+    const wrap = document.createElement('div');
+    wrap.className = 'standalone';
+    const btn = document.createElement('button');
+    btn.className = 'standalone-btn';
+    btn.textContent = label;
+    wrap.appendChild(btn);
+    return { wrap, btn };
+  }
+
+  function showSelectionButton(rect, text) {
+    const { card } = ensureBubble();
+    card.className = 'card standalone';
+    card.innerHTML = '<button class="standalone-btn" data-act="selection-translate">译</button>';
+    bubble.mode = 'selection';
+    bubble.text = text;
+    placeBubble(rect.right + 8, rect.bottom + 6);
+  }
+
+  function showSelectionResult(original, translated) {
+    const { card } = ensureBubble();
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="head"><span class="tag">划词翻译</span><button class="close" data-act="close">×</button></div>
+      <div class="orig"></div>
+      <div class="result"></div>
+      <div class="actions">
+        <button class="act" data-act="copy">复制译文</button>
+      </div>`;
+    card.querySelector('.orig').textContent = original.slice(0, 400);
+    const result = card.querySelector('.result');
+    if (translated) {
+      result.textContent = translated;
+      bubble.translation = translated;
+    } else {
+      result.innerHTML = '<span class="error">暂时没有拿到译文，请稍后再试。</span>';
+    }
+    placeBubble(parseFloat(card.style.left) || 120, parseFloat(card.style.top) || 120);
+  }
+
+  function showInputButton(el, rect) {
+    if (!el || !el.isConnected) return;
+    const { card } = ensureBubble();
+    card.className = 'card standalone';
+    card.innerHTML = '<button class="standalone-btn" data-act="input-translate">译</button>';
+    bubble.mode = 'input';
+    bubble.inputEl = el;
+    placeBubble(rect.right - 44, rect.bottom + 4);
+  }
+
+  function readInputValue(el) {
+    if (!el) return '';
+    if (el.isContentEditable) return el.innerText || '';
+    return el.value || '';
+  }
+
+  function writeInputValue(el, value) {
+    if (!el) return;
+    if (el.isContentEditable) {
+      el.textContent = value;
+    } else {
+      const setter = Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value')?.set;
+      if (setter) setter.call(el, value);
+      else el.value = value;
+    }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function showInputResult(el, original, translated) {
+    const { card } = ensureBubble();
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="head"><span class="tag">输入框翻译</span><button class="close" data-act="close">×</button></div>
+      <div class="orig"></div>
+      <div class="result"></div>
+      <div class="actions">
+        <button class="act primary" data-act="replace-input">替换输入框</button>
+        <button class="act" data-act="copy">复制</button>
+      </div>`;
+    card.querySelector('.orig').textContent = original.slice(0, 300);
+    card.querySelector('.result').textContent = translated || '（没有拿到译文）';
+    bubble.translation = translated;
+    bubble.inputEl = el;
+  }
+
+  function applyTranslationToRecord(record, translated) {
+    if (!record || !translated) return;
+    state.translatedByKey.set(record.key, translated);
+    state.failedKeys.delete(record.key);
+    for (const item of state.records) {
+      if (item.key === record.key) applyRecord(item, translated);
+    }
+  }
+
+  function openCorrection(record) {
+    const { card } = ensureBubble();
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="head"><span class="tag">修正译文</span><button class="close" data-act="close">×</button></div>
+      <div class="orig"></div>
+      <textarea spellcheck="false"></textarea>
+      <div class="actions">
+        <button class="act primary" data-act="save-correction">保存并记住</button>
+        <button class="act" data-act="retry-correction">重新翻译</button>
+        <button class="act" data-act="feedback">报告问题</button>
+        <button class="act" data-act="close">取消</button>
+      </div>
+      <div class="hint">保存后，该站点相同原文都会使用你的译法，并写入本地缓存。</div>`;
+    card.querySelector('.orig').textContent = record.key.slice(0, 400);
+    card.querySelector('textarea').value = String(record.applied || '').trim();
+    bubble.mode = 'correction';
+    bubble.record = record;
+    placeBubble(window.innerWidth / 2 - 180, window.innerHeight / 3);
+    setTimeout(() => card.querySelector('textarea')?.focus(), 30);
+  }
+
+  async function onBubbleClick(event) {
+    const btn = event.target.closest('[data-act]');
+    if (!btn) return;
+    const act = btn.getAttribute('data-act');
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (act === 'close') return hideBubble();
+
+    if (act === 'copy') {
+      try {
+        await navigator.clipboard.writeText(bubble.translation || '');
+      } catch {
+        /* 无剪贴板权限时忽略 */
+      }
+      btn.textContent = '已复制';
+      return;
+    }
+
+    if (act === 'selection-translate') {
+      const text = bubble.text;
+      bubble.card.innerHTML = '<div class="loading">翻译中…</div>';
+      try {
+        const { translated } = await requestTranslation(text);
+        showSelectionResult(text, translated);
+      } catch (err) {
+        showSelectionResult(text, '');
+      }
+      return;
+    }
+
+    if (act === 'input-translate') {
+      const el = bubble.inputEl;
+      const value = keyOf(readInputValue(el));
+      if (!value) return hideBubble();
+      bubble.card.innerHTML = '<div class="loading">翻译中…</div>';
+      try {
+        const { translated } = await requestTranslation(value);
+        showInputResult(el, value, translated);
+      } catch (err) {
+        showInputResult(el, value, '');
+      }
+      return;
+    }
+
+    if (act === 'replace-input') {
+      if (bubble.inputEl && bubble.translation) writeInputValue(bubble.inputEl, bubble.translation);
+      return hideBubble();
+    }
+
+    if (act === 'save-correction') {
+      const value = keyOf(bubble.card.querySelector('textarea')?.value || '');
+      if (!value || !bubble.record) return hideBubble();
+      const pair = langPairFor(bubble.record.key);
+      try {
+        await sendToBackground({
+          type: 'VI2ZH_CORRECT',
+          text: bubble.record.key,
+          translation: value,
+          siteType: state.siteType?.id || 'generic',
+          srcLang: pair.src,
+          tgtLang: pair.tgt
+        });
+        applyTranslationToRecord(bubble.record, value);
+      } catch {
+        /* 保存失败时至少先改当前页 */
+        applyTranslationToRecord(bubble.record, value);
+      }
+      return hideBubble();
+    }
+
+    if (act === 'feedback') {
+      if (!bubble.record) return hideBubble();
+      const pair = langPairFor(bubble.record.key);
+      try {
+        await sendToBackground({
+          type: 'VI2ZH_FEEDBACK',
+          text: bubble.record.key,
+          translation: bubble.record.applied,
+          siteType: state.siteType?.id || 'generic',
+          srcLang: pair.src,
+          tgtLang: pair.tgt
+        });
+      } catch {
+        /* 反馈失败不阻塞界面 */
+      }
+      btn.textContent = '已记录';
+      setTimeout(() => { hideBubble(); }, 700);
+      return;
+    }
+
+    if (act === 'retry-correction') {
+      const record = bubble.record;
+      if (!record) return;
+      bubble.card.innerHTML = '<div class="loading">重新翻译中…</div>';
+      try {
+        const pair = langPairFor(record.key);
+        const res = await sendToBackground({
+          type: 'VI2ZH_FORCE_TRANSLATE',
+          texts: [record.key],
+          siteType: state.siteType?.id || 'generic',
+          srcLang: pair.src,
+          tgtLang: pair.tgt
+        });
+        const translated = (res && res.translations && res.translations[record.key]) || '';
+        if (translated) applyTranslationToRecord(record, translated);
+        hideBubble();
+      } catch {
+        hideBubble();
+      }
+    }
+  }
+
+  function recordFromPoint(x, y) {
+    let node = null;
+    if (document.caretRangeFromPoint) node = document.caretRangeFromPoint(x, y)?.startContainer;
+    else if (document.caretPositionFromPoint) node = document.caretPositionFromPoint(x, y)?.offsetNode;
+    if (!node) return null;
+    if (node.nodeType === Node.ELEMENT_NODE) node = node.firstChild;
+    return state.textRecords.get(node) || null;
+  }
+
+  document.addEventListener('mouseup', (event) => {
+    if (!state.settings || !state.settings.selectionTranslate || !state.enabled) return;
+    if (event.altKey || event.button !== 0) return;
+    const target = event.target;
+    if (target && target.closest && target.closest('[data-vi2zh]')) return;
+    setTimeout(() => {
+      if (bubble.mode === 'input' || bubble.mode === 'correction') return;
+      const selection = window.getSelection();
+      const raw = selection ? selection.toString().trim() : '';
+      if (!raw || raw.length < 2 || raw.length > 1200) {
+        if (bubble.mode === 'selection') hideBubble();
+        return;
+      }
+      if (globalThis.VI2ZH_LANG) {
+        const targetCode = (state.settings.targetLang || 'zh');
+        const detected = globalThis.VI2ZH_LANG.detect(raw);
+        if (detected.code === targetCode && detected.confidence === 'high') return;
+      }
+      let rect;
+      try {
+        rect = selection.getRangeAt(0).getBoundingClientRect();
+      } catch {
+        return;
+      }
+      if (!rect || (!rect.width && !rect.height)) return;
+      showSelectionButton(rect, keyOf(raw));
+    }, 10);
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!event.altKey || !state.enabled) return;
+    const record = recordFromPoint(event.clientX, event.clientY);
+    if (!record || !record.applied) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openCorrection(record);
+  }, true);
+
+  document.addEventListener('focusin', (event) => {
+    const el = event.target;
+    if (!state.settings || !state.settings.inputTranslate) return;
+    if (!el || !el.isConnected) return;
+    const isTextarea = el.tagName === 'TEXTAREA';
+    const isInput = el.tagName === 'INPUT' && !/^(button|submit|reset|checkbox|radio|file|range|color|date|time|number)$/i.test(el.type || 'text');
+    if (!isTextarea && !isInput && !el.isContentEditable) return;
+    const rect = el.getBoundingClientRect();
+    if (!rect.width) return;
+    showInputButton(el, rect);
+  });
+
+  document.addEventListener('focusout', (event) => {
+    if (bubble.mode !== 'input') return;
+    if (bubble.inputEl === event.target) {
+      setTimeout(() => {
+        if (bubble.mode === 'input' && document.activeElement !== bubble.inputEl) hideBubble();
+      }, 180);
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && bubble.mode) hideBubble();
+  });
+
+  document.addEventListener('mousedown', (event) => {
+    if (!bubble.card || bubble.card.hidden) return;
+    if (bubble.host && bubble.host.contains(event.target)) return;
+    if (event.target === bubble.card) return;
+    hideBubble();
+  }, true);
+
+  window.addEventListener('scroll', () => {
+    if (bubble.mode === 'selection' || bubble.mode === 'input') hideBubble();
+  }, true);
+
+  /* ---------------------------------------------------------------- */
   /* 消息                                                              */
   /* ---------------------------------------------------------------- */
 
@@ -935,7 +1483,24 @@
         case 'VI2ZH_RESTORE':
           sendResponse(restore());
           break;
-        case 'VI2ZH_TOGGLE':
+        case 'VI2ZH_TRANSLATE_SELECTION': {
+      if (!state.settings) await loadSettings();
+      const selection = window.getSelection();
+      const text = keyOf(selection ? selection.toString() : '');
+      if (text) {
+        let rect = { right: window.innerWidth / 2, bottom: window.innerHeight / 2 };
+        try {
+          rect = selection.getRangeAt(0).getBoundingClientRect();
+        } catch {
+          /* 用默认位置 */
+        }
+        showSelectionButton(rect, text);
+      }
+      sendResponse({ ok: !!text });
+      return;
+    }
+
+    case 'VI2ZH_TOGGLE':
           sendResponse(await toggle());
           break;
         case 'VI2ZH_STATUS':
@@ -973,7 +1538,8 @@
     try {
       const host = location.hostname;
       const autoHosts = Array.isArray(state.settings.autoHosts) ? state.settings.autoHosts : [];
-      if (host && autoHosts.includes(host) && state.settings.apiKey) {
+      const shouldAuto = state.settings.auto || (host && autoHosts.includes(host));
+      if (!state.settings.disabled && shouldAuto && state.settings.apiKey) {
         setTimeout(() => {
           if (!state.enabled) start({ auto: true });
         }, 800);

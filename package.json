@@ -1,6 +1,6 @@
 {
   "name": "vi2zh-translator",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "用 DeepSeek 将越南语网页整页翻译为简体中文的 Chrome MV3 扩展",
   "private": true,
   "scripts": {
@@ -9,7 +9,8 @@
     "serve": "python3 -m http.server 8788",
     "icons": "python3 tools/make_icons.py",
     "build": "node tools/build.js",
-    "test:stale": "node tools/test-stale.js"
+    "test:stale": "node tools/test-stale.js",
+    "test:unit": "node tools/test-unit.js"
   },
   "keywords": [
     "chrome-extension",

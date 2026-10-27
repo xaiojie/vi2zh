@@ -40,11 +40,21 @@
       <button id="btnRestore" class="ghost">还原原文</button>
     </div>
 
+    <div class="mode-row">
+      <label for="modeSelect">翻译方式</label>
+      <select id="modeSelect">
+        <option value="replace">替换原文</option>
+        <option value="bilingual">双语对照</option>
+      </select>
+    </div>
+
     <label class="switch-row">
       <span>本站自动翻译</span>
       <span class="switch"><input type="checkbox" id="autoSite"><span class="slider"></span></span>
     </label>
     <p class="hint" id="siteHint">—</p>
+
+    <button id="btnOptions" class="ghost wide">高级设置 · 站点规则 · 用量面板</button>
 
     <div id="notice" class="notice" hidden></div>
 

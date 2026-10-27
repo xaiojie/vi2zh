@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vi2Zh · 控制台</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="../icons/icon48.png" alt="" width="36" height="36">
+      <div>
+        <h1>Vi2Zh 控制台</h1>
+        <p>越南语 / 多语言网页翻译 · <span id="version">v—</span></p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="btnCheckUpdate" class="ghost">检查更新</button>
+      <button id="btnClose" class="ghost">关闭</button>
+    </div>
+  </header>
+
+  <div id="updateBanner" class="banner" hidden></div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="general">翻译设置</button>
+    <button class="tab" data-tab="rules">站点规则</button>
+    <button class="tab" data-tab="glossary">术语表</button>
+    <button class="tab" data-tab="cost">用量与预算</button>
+    <button class="tab" data-tab="sync">同步与兼容</button>
+  </nav>
+
+  <main>
+    <!-- 翻译设置 -->
+    <section class="panel active" id="panel-general">
+      <div class="card">
+        <h2>翻译方式</h2>
+        <div class="grid two">
+          <label class="field">
+            <span>显示方式</span>
+            <select id="mode">
+              <option value="replace">替换原文（默认）</option>
+              <option value="bilingual">双语对照：译文 + 小号原文</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>模型策略</span>
+            <select id="modelMode">
+              <option value="fixed">固定模型</option>
+              <option value="auto">自动路由（长文/专业站点用 Pro）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>默认模型</span>
+            <select id="model">
+              <option value="deepseek-flash">DeepSeek Flash（便宜、够快）</option>
+              <option value="deepseek-v4-pro">DeepSeek V4 Pro（更准、更贵）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>源语言</span>
+            <select id="sourceLang">
+              <option value="auto">自动识别</option>
+              <option value="vi">越南语</option>
+              <option value="en">英语</option>
+              <option value="zh">中文</option>
+              <option value="th">泰语</option>
+              <option value="id">印尼语</option>
+              <option value="ja">日语</option>
+              <option value="ko">韩语</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>目标语言</span>
+            <select id="targetLang">
+              <option value="zh">简体中文</option>
+              <option value="vi">越南语</option>
+              <option value="en">英语</option>
+            </select>
+          </label>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="selectionTranslate"> 划词翻译（选中文本后显示“译”按钮）</label>
+          <label><input type="checkbox" id="inputTranslate"> 输入框翻译（聚焦输入框时显示“译”）</label>
+          <label><input type="checkbox" id="showOriginal"> 悬停显示原文（只影响替换模式）</label>
+          <label><input type="checkbox" id="respectNoTranslate"> 遵循网页的 translate=no / notranslate 标记</label>
+          <label><input type="checkbox" id="privacyMode"> 隐私模式（发出前遮住金额、单号、邮箱、URL）</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>批量与限制</h2>
+        <div class="grid three">
+          <label class="field"><span>每批条数</span><input type="number" id="batchSize" min="4" max="40" step="1"></label>
+          <label class="field"><span>并发请求</span><input type="number" id="concurrency" min="1" max="8" step="1"></label>
+          <label class="field"><span>单页请求上限</span><input type="number" id="maxRequests" min="20" max="2000" step="10"></label>
+        </div>
+        <label class="field">
+          <span>额外跳过的 CSS 选择器（逗号分隔）</span>
+          <input type="text" id="skipSelectors" placeholder=".ad-banner, #footer-note">
+        </label>
+      </div>
+    </section>
+
+    <!-- 站点规则 -->
+    <section class="panel" id="panel-rules">
+      <div class="card">
+        <h2>为站点设置规则</h2>
+        <p class="help">规则按域名精确匹配，优先级高于全局设置。当前标签页：<code id="currentHost">—</code></p>
+        <div class="row">
+          <input type="text" id="ruleHost" placeholder="例如 actasp.misa.vn" spellcheck="false">
+          <button id="btnDetectSite" class="ghost">识别站点类型</button>
+          <button id="btnSaveRule" class="primary">保存规则</button>
+        </div>
+        <div class="grid two">
+          <label class="field">
+            <span>站点类型</span>
+            <select id="ruleSiteType">
+              <option value="">跟随全局</option>
+              <option value="auto">自动识别</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>显示方式</span>
+            <select id="ruleMode">
+              <option value="">跟随全局</option>
+              <option value="replace">替换原文</option>
+              <option value="bilingual">双语对照</option>
+            </select>
+          </label>
+        </div>
+        <label class="field"><span>该站点额外跳过选择器</span><input type="text" id="ruleSkip" placeholder=".sidebar-ad"></label>
+        <label class="field"><span>该站点专用术语（每行“越南语=中文”）</span><textarea id="ruleGlossary" rows="4" placeholder="Hóa đơn=发票&#10;Chứng từ=凭证"></textarea></label>
+        <div class="checks">
+          <label><input type="checkbox" id="ruleAuto"> 打开该站点自动翻译</label>
+          <label><input type="checkbox" id="ruleDisabled"> 完全禁用该站点翻译</label>
+        </div>
+        <p class="help" id="detectHint"></p>
+      </div>
+
+      <div class="card">
+        <h2>已配置的站点</h2>
+        <div id="ruleList" class="list"></div>
+      </div>
+    </section>
+
+    <!-- 术语表 -->
+    <section class="panel" id="panel-glossary">
+      <div class="card">
+        <h2>自定义术语表</h2>
+        <p class="help">全局生效，同时供所有站点使用；站点级术语在“站点规则”里单独配置。越译中时优先采用。</p>
+        <div class="row">
+          <input type="text" id="glossarySource" placeholder="越南语，例如 Hóa đơn">
+          <input type="text" id="glossaryTarget" placeholder="中文，例如 发票">
+          <button id="btnAddTerm" class="primary">添加</button>
+        </div>
+        <div id="glossaryList" class="list glossary-list"></div>
+        <p class="help" id="glossaryCount"></p>
+      </div>
+    </section>
+
+    <!-- 用量 -->
+    <section class="panel" id="panel-cost">
+      <div class="card">
+        <h2>用量概览</h2>
+        <div class="stats">
+          <div class="stat"><span>今日费用</span><strong id="todayCost">¥0.0000</strong></div>
+          <div class="stat"><span>本月费用</span><strong id="monthCost">¥0.0000</strong></div>
+          <div class="stat"><span>累计请求</span><strong id="totalRequests">0</strong></div>
+          <div class="stat"><span>累计 tokens</span><strong id="totalTokens">0</strong></div>
+        </div>
+        <p class="help" id="periodHint">—</p>
+        <div id="chart" class="chart" aria-label="最近 14 天费用"></div>
+        <div class="row">
+          <button id="btnBalance" class="ghost">查询账户余额</button>
+          <button id="btnClearCache" class="ghost">清空译文缓存</button>
+          <button id="btnRefreshUsage" class="ghost">刷新</button>
+        </div>
+        <p class="help" id="costNotice"></p>
+      </div>
+
+      <div class="card">
+        <h2>预算告警</h2>
+        <p class="help">达到预算后新请求会被阻止，避免忘记关页面导致连续计费；0 表示不限制。</p>
+        <div class="grid two">
+          <label class="field"><span>每日预算（元）</span><input type="number" id="budgetDaily" min="0" step="0.1"></label>
+          <label class="field"><span>每月预算（元）</span><input type="number" id="budgetMonthly" min="0" step="0.1"></label>
+        </div>
+        <p class="help" id="budgetHint"></p>
+      </div>
+    </section>
+
+    <!-- 同步 -->
+    <section class="panel" id="panel-sync">
+      <div class="card">
+        <h2>设置同步</h2>
+        <p class="help">只同步设置与术语表，API Key 永远不会上传到 Chrome 同步。</p>
+        <label class="checks"><input type="checkbox" id="syncEnabled"> 保存时同步到 Chrome 账号</label>
+        <div class="row">
+          <button id="btnSyncUpload" class="ghost">立即上传</button>
+          <button id="btnSyncPull" class="ghost">从云端恢复</button>
+        </div>
+        <p class="help" id="syncHint">—</p>
+      </div>
+
+      <div class="card">
+        <h2>导入 / 导出</h2>
+        <div class="row">
+          <button id="btnExport" class="ghost">导出设置 JSON</button>
+          <label class="file-btn ghost">导入设置 JSON<input type="file" id="importFile" accept="application/json" hidden></label>
+        </div>
+        <p class="help">导出内容包含设置、术语表、站点规则与用量统计，不含 API Key。</p>
+      </div>
+
+      <div class="card">
+        <h2>浏览器兼容</h2>
+        <ul class="bullets">
+          <li><strong>Chrome / Edge</strong>：直接加载 <code>dist/vi2zh-translator</code>，Edge 在 <code>edge://extensions</code> 打开开发者模式即可。</li>
+          <li><strong>Firefox</strong>：Firefox 109+ 支持 MV3，需在 <code>about:debugging</code> → “临时载入附加组件”选择 manifest.json；部分 <code>chrome.*</code> 回调需 polyfill，当前版本未做完整适配。</li>
+          <li><strong>更新</strong>：源码分发时用 <code>npm run build</code> 生成新版本，重新加载扩展后刷新页面即可。</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span id="saveState">改动后请点击保存</span>
+    <button id="btnSaveAll" class="primary">保存全部设置</button>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="shared/defaults.js"></script>
+  <script src="shared/pricing.js"></script>
+  <script src="shared/sites.js"></script>
+  <script src="shared/lang.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

@@ -65,6 +65,7 @@ function clampNumber(value, min, max, fallback) {
 /* ---------------------------------------------------------------- */
 
 function fillForm(next) {
+  $('modeSelect').value = next.mode === 'bilingual' ? 'bilingual' : 'replace';
   $('apiKey').value = next.apiKey || '';
   $('baseUrl').value = next.baseUrl || DEFAULTS.baseUrl;
   $('model').value = MODEL_VALUES.includes(next.model) ? next.model : DEFAULTS.model;
@@ -80,6 +81,9 @@ function fillForm(next) {
 
 function collectForm() {
   return {
+    ...DEFAULTS,
+    ...(settings || {}),
+    mode: $('modeSelect').value === 'bilingual' ? 'bilingual' : 'replace',
     apiKey: $('apiKey').value.trim(),
     baseUrl: $('baseUrl').value.trim().replace(/\/+$/, '') || DEFAULTS.baseUrl,
     model: MODEL_VALUES.includes($('model').value) ? $('model').value : DEFAULTS.model,
@@ -531,6 +535,12 @@ function bindEvents() {
   $('btnTranslate').addEventListener('click', doTranslate);
   $('btnRestore').addEventListener('click', doRestore);
   $('autoSite').addEventListener('change', onToggleAutoSite);
+  $('btnOptions').addEventListener('click', () => chrome.runtime.openOptionsPage());
+  $('modeSelect').addEventListener('change', async () => {
+    settings = { ...DEFAULTS, ...(settings || {}), mode: $('modeSelect').value === 'bilingual' ? 'bilingual' : 'replace' };
+    await storageSetSettings(settings);
+    await refreshStats();
+  });
   $('btnSave').addEventListener('click', saveSettings);
   $('btnTest').addEventListener('click', testConnection);
 $('btnBalance').addEventListener('click', checkBalance);

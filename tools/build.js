@@ -28,13 +28,26 @@ if (bump) {
   fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n');
 }
 
+// package.json 的版本号跟随 manifest
+const packageFile = path.join(ROOT, 'package.json');
+const pkg = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
+pkg.version = manifest.version;
+fs.writeFileSync(packageFile, JSON.stringify(pkg, null, 2) + '\n');
+
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 for (const entry of ['manifest.json', 'src', 'icons']) {
   fs.cpSync(path.join(ROOT, entry), path.join(OUT, entry), { recursive: true });
 }
 
-const zip = path.join(path.dirname(ROOT), `vi2zh-translator-v${manifest.version}.zip`);
+// 只保留当前版本的 zip，避免目录里堆一堆旧包
+const parent = path.dirname(ROOT);
+for (const name of fs.readdirSync(parent)) {
+  const match = /^vi2zh-translator-v(\d+\.\d+\.\d+)\.zip$/.exec(name);
+  if (match && match[1] !== manifest.version) fs.rmSync(path.join(parent, name), { force: true });
+}
+
+const zip = path.join(parent, `vi2zh-translator-v${manifest.version}.zip`);
 if (fs.existsSync(zip)) fs.rmSync(zip);
 execFileSync('zip', ['-qr', zip, 'vi2zh-translator'], { cwd: DIST });
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "越译中 · 网页翻译（DeepSeek）",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "用 DeepSeek 把越南语网页整页翻译成简体中文：覆盖动态渲染、iframe、Shadow DOM、占位符与提示文本。",
   "minimum_chrome_version": "116",
   "icons": {
@@ -34,7 +34,8 @@
   "host_permissions": [
     "https://api.deepseek.com/*",
     "http://localhost/*",
-    "http://127.0.0.1/*"
+    "http://127.0.0.1/*",
+    "https://api.github.com/*"
   ],
   "optional_host_permissions": [
     "https://*/*",
@@ -48,6 +49,7 @@
       ],
       "js": [
         "src/shared/defaults.js",
+        "src/shared/lang.js",
         "src/shared/sites.js",
         "src/content.js"
       ],
@@ -63,5 +65,9 @@
       },
       "description": "翻译 / 还原当前页面"
     }
+  },
+  "options_ui": {
+    "page": "src/options.html",
+    "open_in_tab": true
   }
 }

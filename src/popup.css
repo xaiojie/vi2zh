@@ -346,3 +346,27 @@ footer {
   font-size: 10px;
   color: #526179;
 }
+
+.mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 10px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.mode-row select {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+button.wide {
+  width: 100%;
+  margin-top: 10px;
+}
