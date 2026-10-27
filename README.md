@@ -136,12 +136,15 @@ background service worker
 - API Key 与译文缓存只存在本机浏览器存储中，不上传到任何第三方。
 - 页面文本仅发送到你自己配置的接口地址（默认 `api.deepseek.com`）。
 - 不注入远程脚本，不收集浏览记录，不含统计埋点。
+- 隐私模式开启后，邮箱、链接、金额、6 位以上数字会先替换成占位符再发送，译文返回后在本机还原。
+- GitHub Actions 每次 push 会跑语法检查、纯逻辑单测与打包（`.github/workflows/ci.yml`），产物在 Actions 的 artifact 里。
 
 ## 本地开发与测试
 
 ```bash
 npm install            # 仅安装 puppeteer-core（不下载浏览器）
 
+npm run test:unit      # 纯逻辑单测（语言/站点/峰谷/清单，不需要浏览器）
 npm run mock           # 启动本地 Mock DeepSeek（127.0.0.1:8787）
 npm run serve          # 静态服务项目根目录（127.0.0.1:8788），访问 /demo/
 npm test               # 端到端测试（自动起 mock + 静态服务）

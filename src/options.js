@@ -330,6 +330,27 @@ async function clearCache() {
 /* 更新 / 同步 / 导入导出                                            */
 /* ---------------------------------------------------------------- */
 
+async function autoCheckUpdate() {
+  try {
+    const stored = await chrome.storage.local.get('lastUpdateCheck');
+    if (Date.now() - (stored.lastUpdateCheck || 0) < 86400000) return;
+    await chrome.storage.local.set({ lastUpdateCheck: Date.now() });
+    const response = await chrome.runtime.sendMessage({ type: 'VI2ZH_CHECK_UPDATE' });
+    if (response && response.ok && response.newer) {
+      const banner = $('updateBanner');
+      banner.hidden = false;
+      banner.innerHTML = `发现新版本 <strong>v${response.latest}</strong>（当前 v${response.current}）`;
+      const link = document.createElement('a');
+      link.href = response.url;
+      link.target = '_blank';
+      link.textContent = '查看更新';
+      banner.appendChild(link);
+    }
+  } catch {
+    /* 离线或 GitHub 限流时静默 */
+  }
+}
+
 async function checkUpdate() {
   const button = $('btnCheckUpdate');
   button.disabled = true;
@@ -507,6 +528,7 @@ async function init() {
 
   bind();
   refreshUsage();
+  autoCheckUpdate();
 }
 
 init();
