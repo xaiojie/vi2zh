@@ -961,16 +961,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 /* 快捷键 / 右键菜单                                                   */
 /* ------------------------------------------------------------------ */
 
+const CONTENT_FILES = [
+  'src/shared/platform.js',
+  'src/shared/defaults.js',
+  'src/shared/lang.js',
+  'src/shared/sites.js',
+  'src/content.js'
+];
+
 async function sendToTab(tabId, message) {
   try {
-    return await chrome.tabs.sendMessage(tabId, message);
+    return await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
   } catch {
     // 安装扩展前就打开的页面没有内容脚本，按需注入
-    await chrome.scripting.executeScript({
-      target: { tabId, allFrames: true },
-      files: ['src/shared/defaults.js', 'src/content.js']
-    });
-    return chrome.tabs.sendMessage(tabId, message);
+    await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: CONTENT_FILES });
+    return chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
   }
 }
 
@@ -1012,10 +1017,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'vi2zh-selection' && tab?.id) {
     chrome.tabs.sendMessage(tab.id, { type: 'VI2ZH_TRANSLATE_SELECTION' }, { frameId: 0 }).catch(async () => {
       try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['src/shared/defaults.js', 'src/shared/lang.js', 'src/content.js']
-        });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: CONTENT_FILES });
         chrome.tabs.sendMessage(tab.id, { type: 'VI2ZH_TRANSLATE_SELECTION' }, { frameId: 0 });
       } catch {
         /* 页面不允许注入时忽略 */

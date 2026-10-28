@@ -140,32 +140,55 @@ async function getActiveTab() {
   return tab || null;
 }
 
-async function ensureContentScript(tabId) {
+const CONTENT_FILES = [
+  'src/shared/platform.js',
+  'src/shared/defaults.js',
+  'src/shared/lang.js',
+  'src/shared/sites.js',
+  'src/content.js'
+];
+
+async function pingTab(tabId) {
   try {
-    const pong = await chrome.tabs.sendMessage(tabId, { type: 'VI2ZH_PING' });
-    if (pong && pong.ok) return true;
+    const pong = await chrome.tabs.sendMessage(tabId, { type: 'VI2ZH_PING' }, { frameId: 0 });
+    return !!(pong && pong.ok);
   } catch {
-    /* 还没注入 */
+    return false;
   }
+}
+
+async function ensureContentScript(tabId) {
+  if (await pingTab(tabId)) return true;
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId, allFrames: true },
-      files: ['src/shared/defaults.js', 'src/content.js']
-    });
-    return true;
+    await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: CONTENT_FILES });
   } catch (err) {
     console.warn('[越译中] 注入内容脚本失败', err);
     return false;
   }
+  // 注入成功不代表监听已就绪，再确认一次，避免把英文底层错误直接抛给用户
+  for (let i = 0; i < 6; i++) {
+    if (await pingTab(tabId)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+  return false;
 }
 
 async function sendToTab(type) {
   if (!currentTab) return { ok: false, error: '没有活动标签页' };
   try {
-    const response = await chrome.tabs.sendMessage(currentTab.id, { type });
-    return response || { ok: false, error: '无响应' };
-  } catch (err) {
-    return { ok: false, error: err.message || '无法与页面通信' };
+    const response = await chrome.tabs.sendMessage(currentTab.id, { type }, { frameId: 0 });
+    return response || { ok: false, error: '页面没有响应，请刷新后重试。' };
+  } catch {
+    // 常见于扩展更新后旧页面未刷新：重新注入一次再试
+    if (await ensureContentScript(currentTab.id)) {
+      try {
+        const retry = await chrome.tabs.sendMessage(currentTab.id, { type }, { frameId: 0 });
+        return retry || { ok: false, error: '页面没有响应，请刷新后重试。' };
+      } catch {
+        /* fall through */
+      }
+    }
+    return { ok: false, error: '页面脚本已失效，请刷新页面（F5）后重试。' };
   }
 }
 
@@ -254,7 +277,7 @@ async function refreshStats() {
 
   if (!stats) {
     try {
-      const response = await chrome.tabs.sendMessage(currentTab.id, { type: 'VI2ZH_STATUS' });
+      const response = await chrome.tabs.sendMessage(currentTab.id, { type: 'VI2ZH_STATUS' }, { frameId: 0 });
       if (response && response.ok) {
         stats = {
           total: response.total || 0,

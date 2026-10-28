@@ -15,8 +15,25 @@
 'use strict';
 
 (() => {
-  if (window.__VI2ZH_LOADED__) return;
+  // 扩展更新后，旧内容脚本仍占着 window 标记，但它的 chrome.runtime 已失效。
+  // 只在这个标记对应「还活着」的实例时才退出，否则重新注册监听，避免
+  // “Could not establish connection. Receiving end does not exist.”。
+  const previousAlive = (() => {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id);
+    } catch {
+      return false;
+    }
+  })();
+  if (window.__VI2ZH_LOADED__ && previousAlive) return;
   window.__VI2ZH_LOADED__ = true;
+
+  // 重新接管时清掉旧实例遗留的悬浮层，避免出现两个 HUD / 卡片
+  if (!previousAlive) {
+    for (const node of document.querySelectorAll('[data-vi2zh="hud"], [data-vi2zh="bubble"]')) {
+      try { node.remove(); } catch { /* ignore */ }
+    }
+  }
 
   // 扩展被重载后，旧脚本里迟到的 Promise 会以这个错误结束；静默丢弃即可
   const isStaleError = (value) => /extension context invalidated/i.test(String(value && (value.message || value)));
